@@ -666,7 +666,7 @@ function renderCoach() {
     } else if (sel && sel.owner === v) {
       html = `<b>② 行動（あと${left}回）</b> 光る都市をタップで移動。<div class="coach-sub">偵察・潜入・置く・渡すは右の「選択中」から。手札のカードも使えます。</div>`;
     } else {
-      html = `<b>② 行動（あと${left}回）</b> まず<b>自分の工作員</b>（帽子のコマ）をタップ。<div class="coach-sub">★が本物、仮面が囮。正体は自分にしか見えません。</div>`;
+      html = `<b>② 行動（あと${left}回）</b> まず<b>自分の工作員</b>（自分の色の肖像の札）をタップ。<div class="coach-sub">★が本物、仮面が囮。正体は自分にしか見えません。</div>`;
     }
     html += '<button data-coach="end" class="small">ターン終了</button>';
   }

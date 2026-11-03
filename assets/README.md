@@ -1,9 +1,10 @@
 # Visual assets
 
-- operations-atlas.png: original generated cinematic artwork, 4 columns × 2 rows.
+- operations-atlas.webp: original generated cinematic artwork, 4 columns × 2 rows
+  (1200×600, WebP quality 82; resized from the 1774×887 source for faster loading).
   Top: interrogate, arrest, steal, trap. Bottom: wiretap, disguise, extract, agent.
-  Displayed using nested SVG viewports; source image is kept intact.
-- operation-nightfall.png: original generated key art.
+  Each tile is shown through a nested SVG viewport (the atlas file itself is not cropped).
+- operation-nightfall.webp: original generated key art (1672×941, WebP quality 78).
 - ../js/world-map.js: coastlines derived from Natural Earth 1:110m land.
   Source: https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_land.geojson
   Public domain: https://www.naturalearthdata.com/about/terms-of-use/

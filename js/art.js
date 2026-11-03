@@ -13,13 +13,13 @@ const SKIN = '#e9e7df';
 const svg = (vb, body, cls = '', extra = '') => `<svg class="${cls}" viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" ${extra}>${body}</svg>`;
 
 // ---------- 工作員（トレンチコートと中折れ帽） ----------
-// 原点を中心に、足元が y=16、帽子のてっぺんが y=-20 くらい
+// 原点を中心にした肖像の札（上端 y=-21、下端 y=17）
 // A shared portrait deliberately reveals no information about the hidden identity.
 export function agentShape(color, label = '', { shadow = true } = {}) {
   return `${shadow ? '<ellipse cy="18" rx="13" ry="3" fill="#000" opacity=".3"/>' : ''}
     <rect x="-12" y="-21" width="24" height="38" rx="2" fill="#161e20" stroke="${color}" stroke-width="2"/>
     <svg x="-11" y="-20" width="22" height="28" viewBox="300 100 100 100" preserveAspectRatio="xMidYMid slice" overflow="hidden">
-      <image href="assets/operations-atlas.png" width="400" height="200"/>
+      <image href="assets/operations-atlas.webp" width="400" height="200"/>
     </svg>
     <path d="M-11 8 H11 V16 H-11 Z" fill="${color}"/>
     <text x="0" y="14.5" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="800" font-size="8">${label || 'AGENT'}</text>`;
@@ -77,7 +77,7 @@ export const trapSVG = (color, cls = 'trap-ico') => svg('-14 -12 28 22', trapSha
 // ---------- カードのイラスト（64x64） ----------
 const CARD_TYPES = ['interrogate', 'arrest', 'steal', 'trap', 'wiretap', 'disguise', 'extract'];
 const CARD_ART = Object.fromEntries(CARD_TYPES.map((key, i) => [key,
-  `<svg width="64" height="64" viewBox="${(i % 4) * 100} ${Math.floor(i / 4) * 100} 100 100" overflow="hidden"><image href="assets/operations-atlas.png" width="400" height="200"/></svg>`]));
+  `<svg width="64" height="64" viewBox="${(i % 4) * 100} ${Math.floor(i / 4) * 100} 100 100" overflow="hidden"><image href="assets/operations-atlas.webp" width="400" height="200"/></svg>`]));
 
 export function cardArtSVG(type, cls = 'card-art') {
   return svg('0 0 64 64', CARD_ART[type] || '', cls);
@@ -133,7 +133,7 @@ export function compassSVG(x, y, r = 26) {
 
 // ---------- タイトルのイラスト ----------
 export function heroSVG() {
-  return svg('0 0 1672 941', '<image href="assets/operation-nightfall.png" width="1672" height="941"/>', 'hero-art', 'preserveAspectRatio="xMidYMin slice"');
+  return svg('0 0 1672 941', '<image href="assets/operation-nightfall.webp" width="1672" height="941"/>', 'hero-art', 'preserveAspectRatio="xMidYMin slice"');
 }
 
 // ---------- 遊び方のイラスト ----------
