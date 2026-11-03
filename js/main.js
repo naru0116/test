@@ -707,12 +707,17 @@ function renderBoard() {
   const out = [];
   const fresh = Date.now() < ui.freshUntil;
 
-  out.push(`<defs><pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M50 0 H0 V50" fill="none" stroke="#a9c4bd" stroke-width="1"/></pattern></defs>
-    <rect width="1000" height="480" fill="#d3e5e1"/><rect width="1000" height="480" fill="url(#grid)" opacity=".7"/>`);
-  for (const d of A.CONTINENTS) out.push(`<path d="${d}" fill="#efe3c3" stroke="#a8936a" stroke-width="1.5"/>`);
+  out.push(`<defs><pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M50 0 H0 V50" fill="none" stroke="#335357" stroke-width="1"/></pattern></defs>
+    <rect width="1000" height="480" fill="#172e34"/><rect width="1000" height="480" fill="url(#grid)" opacity=".7"/>`);
+  for (const d of A.CONTINENTS) out.push(`<path d="${d}" fill="#526b68" stroke="#8c9e8f" stroke-width=".65" fill-rule="evenodd"/>`);
   out.push(A.compassSVG(52, 418));
   out.push(`<g transform="translate(16 16)"><rect width="196" height="40" fill="#fbf6e9" stroke="#2b2620" stroke-width="1.5"/><text x="98" y="17" text-anchor="middle" font-size="11" font-family="'Special Elite', monospace" fill="#2b2620">WORLD OPERATIONS MAP</text><text x="98" y="33" text-anchor="middle" font-size="12" font-weight="700" fill="#b3261e">作戦地図 — 極秘</text></g>`);
 
+  out.push('<text x="22" y="469" font-size="10" fill="#bbc9c2">海岸線：Natural Earth ／ 都市の駒は視認性のため位置を調整</text>');
+  for (const c of G.CITIES) {
+    const x = (c.longitude + 180) * 1000 / 360, y = (85 - c.latitude) * 3.1;
+    out.push(`<path d="M${x} ${y} L${c.x} ${c.y}" stroke="#abb9a6" stroke-width=".8" opacity=".7"/><circle cx="${x}" cy="${y}" r="2" fill="#edcf96"/>`);
+  }
   // 航路
   for (const [a, b, wrap] of G.EDGES) {
     const A1 = G.cityById[a];
@@ -999,12 +1004,12 @@ const RULE_PAGES = [
   {
     title: 'ミッション',
     art: () => A.tutorialArt('goal'),
-    html: '<p><b>本物の工作員</b>に、<b>本物の機密ファイル</b>を<b>2つ</b>持たせて、自分の<b>拠点</b>（旗の立った隠れ家）に戻れば勝ちです。</p><p>2〜6人で遊べます。15ラウンドたっても決着しないときは、本物のファイルをいちばん多く持っている人の勝ちです。</p>',
+    html: '<p><b>本物の工作員</b>に、<b>本物の機密ファイル</b>を<b>2つ</b>持たせて、自分の<b>拠点</b>（HQのマーク）に戻れば勝ちです。</p><p>2〜6人で遊べます。15ラウンドたっても決着しないときは、本物のファイルをいちばん多く持っている人の勝ちです。</p>',
   },
   {
     title: '3人のうち、本物は1人',
     art: () => A.tutorialArt('identity'),
-    html: '<p>工作員は1人につき3人（A・B・C）。そのうち<b>1人だけが本物</b>（★）で、2人は<b>囮</b>（仮面）です。</p><p>正体は<b>自分にしか見えません</b>。相手から見ると、全員ただの帽子のコマです。囮も上手に動かして、相手を惑わせましょう。</p>',
+    html: '<p>工作員は1人につき3人（A・B・C）。そのうち<b>1人だけが本物</b>（★）で、2人は<b>囮</b>（仮面）です。</p><p>正体は<b>自分にしか見えません</b>。相手から見ると、全員同じ肖像のコマです。囮も上手に動かして、相手を惑わせましょう。</p>',
   },
   {
     title: 'ファイルは本物？ 偽物？',

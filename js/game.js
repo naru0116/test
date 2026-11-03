@@ -3,19 +3,19 @@
 
 export const CITIES = [
   // 北ルート（西→東）
-  { id: 'ny', name: 'ニューヨーク', x: 245, y: 140 },
-  { id: 'london', name: 'ロンドン', x: 445, y: 100 },
-  { id: 'berlin', name: 'ベルリン', x: 535, y: 118 },
-  { id: 'moscow', name: 'モスクワ', x: 625, y: 85 },
-  { id: 'beijing', name: '北京', x: 800, y: 150 },
-  { id: 'tokyo', name: '東京', x: 905, y: 180 },
+  { id: 'ny', name: 'ニューヨーク', x: 295, y: 145, longitude: -74.006, latitude: 40.713 },
+  { id: 'london', name: 'ロンドン', x: 450, y: 105, longitude: -0.128, latitude: 51.507 },
+  { id: 'berlin', name: 'ベルリン', x: 540, y: 105, longitude: 13.405, latitude: 52.52 },
+  { id: 'moscow', name: 'モスクワ', x: 635, y: 85, longitude: 37.618, latitude: 55.756 },
+  { id: 'beijing', name: '北京', x: 800, y: 135, longitude: 116.407, latitude: 39.904 },
+  { id: 'tokyo', name: '東京', x: 905, y: 180, longitude: 139.692, latitude: 35.689 },
   // 南ルート（西→東）
-  { id: 'rio', name: 'リオ', x: 330, y: 385 },
-  { id: 'casablanca', name: 'カサブランカ', x: 430, y: 225 },
-  { id: 'istanbul', name: 'イスタンブール', x: 575, y: 195 },
-  { id: 'dubai', name: 'ドバイ', x: 670, y: 275 },
-  { id: 'singapore', name: 'シンガポール', x: 790, y: 345 },
-  { id: 'sydney', name: 'シドニー', x: 910, y: 410 },
+  { id: 'rio', name: 'リオ', x: 380, y: 350, longitude: -43.173, latitude: -22.907 },
+  { id: 'casablanca', name: 'カサブランカ', x: 455, y: 225, longitude: -7.59, latitude: 33.573 },
+  { id: 'istanbul', name: 'イスタンブール', x: 575, y: 195, longitude: 28.978, latitude: 41.008 },
+  { id: 'dubai', name: 'ドバイ', x: 670, y: 255, longitude: 55.27, latitude: 25.205 },
+  { id: 'singapore', name: 'シンガポール', x: 790, y: 320, longitude: 103.82, latitude: 1.352 },
+  { id: 'sydney', name: 'シドニー', x: 920, y: 410, longitude: 151.209, latitude: -33.869 },
 ];
 
 // 北ルートと南ルートの2つの環を南北の道でつないだ形（どの都市からも道が3本）。

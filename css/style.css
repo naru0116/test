@@ -345,3 +345,65 @@ button, input, select { border-radius: 2px; box-shadow: none; }
 .music-controls input { width: 88px; accent-color: #c66458; }
 #music-status:empty { display: none; }
 @media (max-width: 480px) { .music-title { width: 100%; } }
+
+/* Cinematic dossier edition */
+:root { --desk: #101b20; --desk-2: #0c1418; --paper: #eee9dc; --paper-2: #ded7c6; --manila: #c7b68e; --stamp: #983b32; --stamp-d: #732c25; }
+body { background: #101b20; }
+#screen-title { max-width: 1280px; padding-top: 24px; }
+.hero { position: relative; isolation: isolate; overflow: hidden; display: flex; min-height: 530px; padding: 64px 48px; border: 1px solid #4c5149; background: #10191b; }
+.hero-art-wrap { position: absolute; inset: 0; z-index: -2; max-width: none; background: none; }
+.hero-art { width: 100%; height: 100%; object-fit: cover; }
+.hero-art-wrap svg { width: 100%; height: 100%; }
+.hero-art-wrap svg image { width: 100%; height: 100%; }
+.hero::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(7,16,19,.72), transparent 80%); }
+.hero-text { max-width: 570px; }
+.hero h1 { font-size: clamp(44px, 5.4vw, 76px); line-height: 1.2; letter-spacing: .045em; font-weight: 900; color: #f4efdf; }
+.hero-sub { font-size: 15px; line-height: 2; color: #dad9cc; text-shadow: 0 1px 6px #000; }
+.kicker { color: #d0b17b; font-size: 11px; letter-spacing: .26em; margin-bottom: 20px; }
+.hero-actions button { border-color: #c0aa80; color: #ead7ae; padding: 11px 22px; font-size: 13px; }
+.codename { margin: 25px 0 36px; padding-bottom: 22px; border-bottom: 1px solid #354146; }
+.codename label { color: #bca77d; font-size: 13px; }
+.mode { background: #e7e1d3; border: 1px solid #84775f; padding: 20px; gap: 12px; }
+.mode-tab { background: #bfa77b; border-color: #84775f; border-radius: 0; letter-spacing: .1em; font-size: 10px; }
+.mode h2 { font-weight: 700; font-size: 19px; }
+.mode-icon { display: none; }
+.mode p { font-size: 13px; }
+.music-controls { background: #0b1317; border-bottom-color: #354146; }
+.music-title { color: #c8af80; font-size: 10px; }
+.sheet { border: 1px solid #847b66; padding: 14px; }
+.sheet h3 { border-bottom: 1px solid #c5bca5; padding-bottom: 10px; letter-spacing: .03em; }
+.game-main { grid-template-columns: minmax(0, 1fr) 400px; gap: 18px; margin-top: 16px; }
+.board-wrap { border: 1px solid #8c7d5c; border-radius: 2px; }
+.route { stroke: #d2bb89; stroke-width: 1.5; stroke-dasharray: 5 5; }
+.route-under { stroke: #152b30; stroke-width: 4; opacity: .65; }
+.route-label { fill: #e1cfa9; font-size: 10px; }
+.city-tag rect { fill: #e7e2d2; stroke: #9d967f; stroke-width: .7; }
+.city-tag text { fill: #1d2c30; font-size: 12px; }
+.card { padding: 0 0 10px; gap: 7px; overflow: hidden; border: 1px solid #b4a17a; border-radius: 2px; background: #f4efdf; box-shadow: 0 3px 8px #0002; }
+.card .card-art { max-height: none; aspect-ratio: 1; border: 0; border-radius: 0; display: block; background: #142126; }
+.card b { font-size: 13px; letter-spacing: .05em; padding: 0 3px; }
+.card small { font-size: 10px; padding: 0 4px; color: #514b3d; }
+.card:disabled { opacity: .72; }
+.card:hover:not(:disabled) { transform: translateY(-3px); background: #fff9e9; box-shadow: 0 6px 14px #0003; }
+.market { gap: 8px; }
+.market .deck-btn { background: #253331; color: #ddcaa3; border-color: #ab9264; }
+.market .deck-btn svg { max-height: none; }
+.hand { grid-template-columns: repeat(auto-fill, minmax(106px, 1fr)); gap: 10px; }
+.coach { border-radius: 2px; border-color: #847b66; border-left-color: #b59255; }
+.hud { padding: 10px 0; border-bottom: 1px solid #354146; }
+.foot { color: #a6aca6; }
+@media (max-width: 1100px) { .game-main { grid-template-columns: minmax(0, 1fr); } .side { display: grid; grid-template-columns: 1fr 1fr; align-items: start; } }
+@media (max-width: 760px) {
+  .hero { min-height: 480px; padding: 38px 24px; align-items: end; }
+  .hero-art-wrap { max-width: none; }
+  .hero-art { min-width: 850px; transform: translateX(-35%); }
+  .hero::after { background: linear-gradient(0deg, #0a1519 3%, #0a1519a8 55%, transparent); }
+  .hero-text { width: 100%; }
+  .hero h1 { font-size: 44px; }
+  .hero-sub { font-size: 12px; }
+  .side { display: flex; }
+  .music-title { width: auto; }
+}
+.card:disabled { opacity: 1; cursor: not-allowed; }
+.card:disabled b, .card:disabled small { opacity: .6; }
+@media (max-width: 760px) { .hero-art { transform: translateX(-48%); } }

@@ -1,3 +1,5 @@
+import { CONTINENTS } from './world-map.js';
+export { CONTINENTS };
 // 作戦資料をテーマにしたベクター記号
 // 線は「インク色」、塗りは紙・マニラ封筒・朱色のスタンプを基調にしている。
 
@@ -12,10 +14,15 @@ const svg = (vb, body, cls = '', extra = '') => `<svg class="${cls}" viewBox="${
 
 // ---------- 工作員（トレンチコートと中折れ帽） ----------
 // 原点を中心に、足元が y=16、帽子のてっぺんが y=-20 くらい
+// A shared portrait deliberately reveals no information about the hidden identity.
 export function agentShape(color, label = '', { shadow = true } = {}) {
-  return `<rect x="-11" y="-18" width="22" height="33" rx="3" fill="${color}" stroke="#fff" stroke-width="1.5"/>
-    <path d="M-7 -12 H7" stroke="#fff" stroke-width="2" opacity=".65"/>
-    <text x="0" y="7" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="700" font-size="17">${label || '•'}</text>`;
+  return `${shadow ? '<ellipse cy="18" rx="13" ry="3" fill="#000" opacity=".3"/>' : ''}
+    <rect x="-12" y="-21" width="24" height="38" rx="2" fill="#161e20" stroke="${color}" stroke-width="2"/>
+    <svg x="-11" y="-20" width="22" height="28" viewBox="300 100 100 100" preserveAspectRatio="xMidYMid slice" overflow="hidden">
+      <image href="assets/operations-atlas.png" width="400" height="200"/>
+    </svg>
+    <path d="M-11 8 H11 V16 H-11 Z" fill="${color}"/>
+    <text x="0" y="14.5" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="800" font-size="8">${label || 'AGENT'}</text>`;
 }
 
 export function agentSVG(color, label = '', cls = 'agent-ico') {
@@ -68,18 +75,9 @@ export function trapShape(color = INK) {
 export const trapSVG = (color, cls = 'trap-ico') => svg('-14 -12 28 22', trapShape(color), cls);
 
 // ---------- カードのイラスト（64x64） ----------
-// Unified two-pixel pictograms: no generated character illustrations.
-const SYMBOLS = {
-  interrogate: '<path d="M8 10 H56 V43 H30 L18 54 V43 H8 Z"/><path d="M26 23 C26 14 42 14 40 24 C39 28 32 28 32 34"/><path d="M32 38 V39"/>',
-  arrest: '<circle cx="18" cy="39" r="11"/><circle cx="46" cy="25" r="11"/><path d="M28 34 L36 30 M12 24 H24 M40 10 H52"/>',
-  steal: '<path d="M8 16 H26 L32 22 H56 V52 H8 Z M18 37 H45 M38 30 L45 37 L38 44"/>',
-  trap: '<path d="M32 8 L58 54 H6 Z M32 24 V37 M32 44 V46"/>',
-  wiretap: '<path d="M12 39 V29 A20 20 0 0 1 52 29 V39"/><rect x="8" y="32" width="10" height="20" rx="3"/><rect x="46" y="32" width="10" height="20" rx="3"/><path d="M27 29 V43 M33 24 V48 M39 29 V43"/>',
-  disguise: '<rect x="8" y="10" width="48" height="44"/><circle cx="24" cy="26" r="6"/><path d="M14 44 Q24 29 34 44 M40 24 H49 M40 32 H49 M40 40 H49"/>',
-  extract: '<path d="M29 12 H10 V54 H29 M24 32 H56 M44 20 L56 32 L44 44"/>',
-};
-const CARD_ART = Object.fromEntries(Object.entries(SYMBOLS).map(([key, paths]) =>
-  [key, `<g fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</g>`]));
+const CARD_TYPES = ['interrogate', 'arrest', 'steal', 'trap', 'wiretap', 'disguise', 'extract'];
+const CARD_ART = Object.fromEntries(CARD_TYPES.map((key, i) => [key,
+  `<svg width="64" height="64" viewBox="${(i % 4) * 100} ${Math.floor(i / 4) * 100} 100 100" overflow="hidden"><image href="assets/operations-atlas.png" width="400" height="200"/></svg>`]));
 
 export function cardArtSVG(type, cls = 'card-art') {
   return svg('0 0 64 64', CARD_ART[type] || '', cls);
@@ -88,10 +86,13 @@ export function cardArtSVG(type, cls = 'card-art') {
 // カードの裏（山札）
 export function cardBackSVG(cls = 'card-back') {
   return svg('0 0 64 88', `
-    <rect x="2" y="2" width="60" height="84" rx="6" fill="#2f3b33" stroke="${INK}" stroke-width="2"/>
-    <rect x="7" y="7" width="50" height="74" rx="4" fill="none" stroke="${MANILA}" stroke-width="1.2" stroke-dasharray="3 2"/>
-    <g transform="translate(32 40) scale(1.25)">${agentShape('#8b1f1a', '', { shadow: false })}</g>
-    <text x="32" y="74" text-anchor="middle" font-size="9" fill="${MANILA}" font-family="'Special Elite', monospace" letter-spacing="1">CLASSIFIED</text>`, cls);
+    <rect x="1" y="1" width="62" height="86" rx="2" fill="#192c30" stroke="#bca370"/>
+    <rect x="5" y="5" width="54" height="78" fill="none" stroke="#bca370" stroke-width=".5"/>
+    <path d="M8 18 H56 M8 70 H56 M32 24 V64 M12 44 H52" stroke="#bca370" stroke-width=".5"/>
+    <circle cx="32" cy="44" r="17" fill="none" stroke="#bca370" stroke-width=".6"/>
+    <path d="M32 23 L36 40 L49 44 L36 48 L32 65 L28 48 L15 44 L28 40 Z" fill="none" stroke="#dcc392"/>
+    <text x="32" y="13" text-anchor="middle" font-size="4.8" letter-spacing="1" fill="#dcc392" font-family="monospace">INTELLIGENCE</text>
+    <text x="32" y="78" text-anchor="middle" font-size="4.8" letter-spacing=".7" fill="#dcc392" font-family="monospace">CLASSIFIED</text>`, cls);
 }
 
 // ---------- アイコン（24x24、線画） ----------
@@ -119,34 +120,6 @@ export function icon(name, cls = 'ico') { return svg('0 0 24 24', ICONS[name] ||
 
 // ---------- 地図の装飾 ----------
 // 大陸（ざっくりとした古地図風の形）
-export const CONTINENTS = [
-  // 北アメリカ
-  'M55 70 Q120 40 210 42 Q300 38 345 70 Q360 100 318 128 Q300 150 290 190 Q262 230 228 262 Q205 285 190 300 Q170 286 160 255 Q120 215 92 185 Q60 150 50 110 Z',
-  // グリーンランド
-  'M330 30 Q370 22 395 34 Q392 58 362 66 Q338 58 330 30 Z',
-  // 南アメリカ
-  'M255 300 Q300 296 330 318 Q370 340 372 372 Q360 410 330 440 Q308 470 292 470 Q282 440 272 405 Q250 360 255 300 Z',
-  // ヨーロッパ
-  'M418 92 Q430 70 470 62 Q520 50 570 58 Q610 52 640 70 Q600 110 600 150 Q585 172 560 176 Q530 170 506 168 Q478 160 458 150 Q430 140 418 120 Z',
-  // イギリス
-  'M432 84 Q446 74 452 90 Q450 112 438 114 Q428 102 432 84 Z',
-  // アフリカ
-  'M410 200 Q450 190 500 200 Q545 196 580 230 Q615 262 610 300 Q600 340 575 380 Q556 430 532 448 Q510 440 498 400 Q478 352 452 316 Q420 280 405 245 Z',
-  // アジア
-  'M600 60 Q680 34 780 36 Q880 40 950 70 Q985 110 950 150 Q930 180 900 210 Q872 238 850 262 Q832 300 808 320 Q785 300 770 280 Q740 290 712 296 Q690 262 650 250 Q615 236 598 210 Q588 180 606 150 Q640 110 600 60 Z',
-  // アラビア
-  'M630 238 Q668 248 700 270 Q712 300 690 322 Q660 330 640 300 Q628 270 630 238 Z',
-  // インド
-  'M712 262 Q750 266 770 286 Q760 320 742 340 Q722 318 712 290 Z',
-  // 東南アジアの島々
-  'M776 336 Q800 330 822 342 Q842 356 830 366 Q804 366 782 356 Z',
-  'M840 352 Q870 344 892 358 Q880 372 852 370 Z',
-  // 日本
-  'M902 150 Q918 154 920 170 Q916 190 904 204 Q896 196 898 178 Z',
-  // オーストラリア
-  'M842 392 Q880 372 930 380 Q968 392 972 428 Q960 462 916 466 Q872 462 850 440 Q834 418 842 392 Z',
-];
-
 export function compassSVG(x, y, r = 26) {
   return `<g transform="translate(${x} ${y})" opacity=".85">
     <circle r="${r}" fill="${PAPER}" stroke="${INK}" stroke-width="1.2"/>
@@ -160,18 +133,7 @@ export function compassSVG(x, y, r = 26) {
 
 // ---------- タイトルのイラスト ----------
 export function heroSVG() {
-  return svg('0 0 360 210', `
-    <rect width="360" height="210" fill="#e9e7df"/>
-    <path d="M24 44 H336 M24 174 H336" stroke="#242a2e"/>
-    <g fill="#242a2e" font-family="monospace">
-      <text x="24" y="30" font-size="10" letter-spacing="2">INTELLIGENCE BUREAU / 001</text>
-      <text x="24" y="82" font-size="11" letter-spacing="3">OPERATION</text>
-      <text x="20" y="133" font-size="48" font-weight="700" letter-spacing="-2">CLASSIFIED</text>
-      <text x="24" y="158" font-size="10">3 AGENTS. 1 IDENTITY. 2 FILES.</text>
-      <text x="24" y="194" font-size="9">ACCESS RESTRICTED</text>
-    </g>
-    <rect x="228" y="183" width="108" height="10" fill="#a53932"/>
-    <path d="M268 57 H336 M294 65 H336" stroke="#242a2e" stroke-width="5"/>`, 'hero-art');
+  return svg('0 0 1672 941', '<image href="assets/operation-nightfall.png" width="1672" height="941"/>', 'hero-art', 'preserveAspectRatio="xMidYMin slice"');
 }
 
 // ---------- 遊び方のイラスト ----------
