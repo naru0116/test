@@ -69,7 +69,10 @@ async function guard(btn, fn) {
   ui.busy = true;
   if (btn) btn.disabled = true;
   $('#title-msg').textContent = '';
-  try { await fn(); } catch (e) {
+  try {
+    if (!lobby) throw new Error('オンライン対戦サーバー（Firebase）に接続できていません。通信環境を確認して再読み込みしてください。「1台で遊ぶ」は使えます。');
+    await fn();
+  } catch (e) {
     console.error(e);
     $('#title-msg').textContent = e.message || String(e);
   } finally {
@@ -102,7 +105,7 @@ async function init() {
     db = await connectDB(firebaseConfig);
   } catch (e) {
     console.error(e);
-    $('#title-msg').textContent = 'Firebase に接続できませんでした。設定を確認してください。';
+    $('#title-msg').textContent = 'オンライン対戦サーバー（Firebase）に接続できませんでした。通信環境を確認して再読み込みしてください。「1台で遊ぶ」は使えます。';
     return;
   }
   lobby = new Lobby(db, uid);

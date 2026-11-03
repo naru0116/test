@@ -1,13 +1,14 @@
-// Firebase の設定。README の手順で取得した値を貼り付けると本番のオンライン対戦が有効になります。
-// null のままだと「デモモード」（同じブラウザの別タブ同士でのみ対戦できる）で動きます。
-//
-// 例:
-// export const firebaseConfig = {
-//   apiKey: "AIza...",
-//   authDomain: "your-project.firebaseapp.com",
-//   databaseURL: "https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app",
-//   projectId: "your-project",
-//   appId: "1:1234567890:web:abcdef",
-// };
+// Firebase の設定（Firebase コンソール →「プロジェクトの設定」→「マイアプリ」の値）。
+// ウェブアプリ用の apiKey は公開されても問題ない値です（アクセス制御は database.rules.json で行います）。
+// null にするとデモモード（同じブラウザの別タブ同士でのみ対戦）で動きます。
 
-export const firebaseConfig = null;
+export const firebaseConfig = {
+  apiKey: 'AIzaSyCOYoYkDImeX8VXRbaq5OqyHIs5r-zYgVs',
+  authDomain: 'beppan-game.firebaseapp.com',
+  databaseURL: 'https://beppan-game-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId: 'beppan-game',
+  storageBucket: 'beppan-game.firebasestorage.app',
+  messagingSenderId: '672246300626',
+  appId: '1:672246300626:web:129d96d9748dbb6f8ad20b',
+  measurementId: 'G-V851T053DX',
+};
