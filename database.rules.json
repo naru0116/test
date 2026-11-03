@@ -1,0 +1,23 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "match": {
+      "$size": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['roomId', 'createdAt']) && newData.child('roomId').isString() && newData.child('roomId').val().length <= 12"
+      }
+    },
+    "rooms": {
+      "$room": {
+        ".read": true,
+        ".write": true,
+        ".validate": "$room.length <= 12",
+        "state": {
+          ".validate": "newData.isString() && newData.val().length < 200000"
+        }
+      }
+    }
+  }
+}
