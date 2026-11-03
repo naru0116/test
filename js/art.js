@@ -1,28 +1,21 @@
-// イラスト集（すべて手描きのインライン SVG）
+// 作戦資料をテーマにしたベクター記号
 // 線は「インク色」、塗りは紙・マニラ封筒・朱色のスタンプを基調にしている。
 
 const INK = '#2b2620';
 const PAPER = '#fbf6e9';
-const MANILA = '#e5c578';
-const MANILA_D = '#c9a253';
+const MANILA = '#dedbd0';
+const MANILA_D = '#bcb8ab';
 const STAMP = '#b3261e';
-const SKIN = '#f1d9b5';
+const SKIN = '#e9e7df';
 
 const svg = (vb, body, cls = '', extra = '') => `<svg class="${cls}" viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" ${extra}>${body}</svg>`;
 
 // ---------- 工作員（トレンチコートと中折れ帽） ----------
 // 原点を中心に、足元が y=16、帽子のてっぺんが y=-20 くらい
 export function agentShape(color, label = '', { shadow = true } = {}) {
-  return `${shadow ? '<ellipse cx="0" cy="16" rx="11" ry="3" fill="#000" opacity=".22"/>' : ''}
-  <path d="M-9.5 15.5 L-7.6 -1.5 Q0 -6.2 7.6 -1.5 L9.5 15.5 Z" fill="${color}" stroke="${INK}" stroke-width="1.4" stroke-linejoin="round"/>
-  <path d="M0 -3.6 L-3.6 4.2 M0 -3.6 L3.6 4.2" stroke="${INK}" stroke-width="1" opacity=".45" fill="none"/>
-  <path d="M-8.4 7 L8.4 7" stroke="${INK}" stroke-width="1.8" opacity=".5"/>
-  <circle cx="0" cy="-8" r="5" fill="${SKIN}" stroke="${INK}" stroke-width="1.2"/>
-  <rect x="-3.9" y="-8.9" width="7.8" height="2.1" rx="1" fill="${INK}"/>
-  <path d="M-5.3 -11.4 L-4.6 -18.2 Q0 -20.4 4.6 -18.2 L5.3 -11.4 Z" fill="${INK}"/>
-  <rect x="-5.1" y="-13.6" width="10.2" height="1.9" fill="${color}"/>
-  <path d="M-9.4 -10.6 Q0 -14 9.4 -10.6 L9.4 -9.6 Q0 -12.2 -9.4 -9.6 Z" fill="${INK}"/>
-  ${label ? `<text x="0" y="13.2" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="'Zen Kaku Gothic New', sans-serif">${label}</text>` : ''}`;
+  return `<rect x="-11" y="-18" width="22" height="33" rx="3" fill="${color}" stroke="#fff" stroke-width="1.5"/>
+    <path d="M-7 -12 H7" stroke="#fff" stroke-width="2" opacity=".65"/>
+    <text x="0" y="7" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="700" font-size="17">${label || '•'}</text>`;
 }
 
 export function agentSVG(color, label = '', cls = 'agent-ico') {
@@ -63,87 +56,30 @@ export const folderSVG = (kind = 'unknown', cls = 'folder-ico') => svg('0 3 40 2
 
 // ---------- 拠点（隠れ家と旗） ----------
 export function baseShape(color) {
-  return `<ellipse cx="0" cy="13" rx="17" ry="3.5" fill="#000" opacity=".18"/>
-  <path d="M-13 12 V-1 L0 -11 L13 -1 V12 Z" fill="${PAPER}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>
-  <path d="M-15.5 0 L0 -12.5 L15.5 0" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="-4" y="3" width="8" height="9" fill="${INK}"/>
-  <path d="M9 -6 V-25" stroke="${INK}" stroke-width="1.6"/>
-  <path d="M9 -25 L21 -21 L9 -17 Z" fill="${color}" stroke="${INK}" stroke-width="1.1" stroke-linejoin="round"/>`;
+  return `<rect x="-14" y="-16" width="28" height="30" fill="${PAPER}" stroke="${color}" stroke-width="3"/>
+    <path d="M-9 -9 H9 M-9 -5 H9" stroke="${color}"/>
+    <text x="0" y="8" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="${INK}">HQ</text>`;
 }
 
-// ---------- 罠（トラバサミ） ----------
 export function trapShape(color = INK) {
-  const teeth = [];
-  for (let i = 0; i < 7; i++) {
-    const x = -9 + i * 3;
-    teeth.push(`${x},0 ${x + 1.5},-3.5`);
-  }
-  return `<ellipse cx="0" cy="3" rx="11" ry="3" fill="#000" opacity=".2"/>
-  <path d="M-11 1 Q0 9 11 1" fill="none" stroke="${INK}" stroke-width="2.2"/>
-  <path d="M-11 0 Q0 -10 11 0" fill="none" stroke="${INK}" stroke-width="2.2"/>
-  <polyline points="${teeth.join(' ')} 12,0" fill="none" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>
-  <circle cx="0" cy="1" r="3" fill="${color}" stroke="${INK}" stroke-width="1"/>`;
+  return `<path d="M0 -10 L12 8 H-12 Z" fill="${PAPER}" stroke="${color}" stroke-width="1.5"/>
+    <path d="M0 -4 V1 M0 4 V5" stroke="${color}" stroke-width="2"/>`;
 }
-export const trapSVG = (color, cls = 'trap-ico') => svg('-13 -11 26 17', trapShape(color), cls);
+export const trapSVG = (color, cls = 'trap-ico') => svg('-14 -12 28 22', trapShape(color), cls);
 
 // ---------- カードのイラスト（64x64） ----------
-const CARD_ART = {
-  interrogate: `
-    <path d="M32 2 V12" stroke="${INK}" stroke-width="2"/>
-    <path d="M20 22 L25 12 H39 L44 22 Z" fill="#3f4a3c" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/>
-    <path d="M21 22 L8 62 H56 L43 22 Z" fill="#f7e27c" opacity=".55"/>
-    <ellipse cx="32" cy="22" rx="12" ry="2.5" fill="#fff6c4" stroke="${INK}" stroke-width="1.2"/>
-    <circle cx="32" cy="40" r="6.5" fill="${SKIN}" stroke="${INK}" stroke-width="1.6"/>
-    <path d="M20 60 Q20 48 32 48 Q44 48 44 60" fill="#7b7466" stroke="${INK}" stroke-width="1.6"/>
-    <path d="M29 39.5 h2 M33 39.5 h2" stroke="${INK}" stroke-width="1.5" stroke-linecap="round"/>
-    <path d="M30 43.5 q2 -1.4 4 0" stroke="${INK}" stroke-width="1.2" fill="none"/>
-    <text x="49" y="40" font-size="13" font-weight="900" fill="${STAMP}" font-family="'Dela Gothic One', sans-serif">?</text>`,
-  arrest: `
-    <circle cx="20" cy="38" r="12" fill="none" stroke="#8d939a" stroke-width="6"/>
-    <circle cx="20" cy="38" r="12" fill="none" stroke="${INK}" stroke-width="1.4"/>
-    <circle cx="20" cy="38" r="6" fill="none" stroke="${INK}" stroke-width="1.2"/>
-    <circle cx="44" cy="26" r="12" fill="none" stroke="#8d939a" stroke-width="6"/>
-    <circle cx="44" cy="26" r="12" fill="none" stroke="${INK}" stroke-width="1.4"/>
-    <circle cx="44" cy="26" r="6" fill="none" stroke="${INK}" stroke-width="1.2"/>
-    <path d="M29 31 l3 -1.5 l3 1.5 l3 -1.5" fill="none" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>
-    <rect x="12" y="49" width="16" height="5" rx="1.5" fill="#8d939a" stroke="${INK}" stroke-width="1.2"/>
-    <rect x="36" y="12" width="16" height="5" rx="1.5" fill="#8d939a" stroke="${INK}" stroke-width="1.2" transform="rotate(-10 44 14)"/>`,
-  steal: `
-    <g transform="rotate(-10 34 30)">${folderShape('unknown', 34).replace('<g transform="scale(0.85)">', '<g transform="translate(22 14) scale(0.85)">')}</g>
-    <path d="M4 50 Q14 46 20 40 L28 33 Q31 31 32.5 33.5 Q33.5 35.5 31 37.5 L27 41 L37 37 Q40 36 41 38.5 Q41.5 41 38.5 42 L30 45 Q22 52 14 56 Z" fill="${SKIN}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>
-    <path d="M2 49 L14 56 L10 62 L0 56 Z" fill="${INK}"/>
-    <path d="M44 10 l4 -4 M50 16 l6 -2 M47 12 l6 -6" stroke="${STAMP}" stroke-width="2" stroke-linecap="round"/>`,
-  trap: `
-    <ellipse cx="32" cy="48" rx="26" ry="7" fill="#000" opacity=".15"/>
-    <path d="M8 44 Q32 62 56 44" fill="#9aa0a6" stroke="${INK}" stroke-width="2"/>
-    <path d="M8 42 Q32 18 56 42" fill="none" stroke="${INK}" stroke-width="3"/>
-    <polyline points="10,42 13,34 16,42 19,31 22,42 25,29 28,42 31,28 34,42 37,29 40,42 43,31 46,42 49,34 52,42 55,38" fill="#e4e7ea" stroke="${INK}" stroke-width="1.4" stroke-linejoin="round"/>
-    <circle cx="32" cy="46" r="5" fill="${STAMP}" stroke="${INK}" stroke-width="1.4"/>
-    <path d="M56 46 q6 2 6 8" fill="none" stroke="${INK}" stroke-width="1.6" stroke-dasharray="2 2"/>`,
-  wiretap: `
-    <path d="M14 38 Q14 12 32 12 Q50 12 50 38" fill="none" stroke="${INK}" stroke-width="4.5" stroke-linecap="round"/>
-    <path d="M14 38 Q14 12 32 12 Q50 12 50 38" fill="none" stroke="#5a6b7a" stroke-width="2.4" stroke-linecap="round"/>
-    <rect x="8" y="34" width="11" height="17" rx="4" fill="#5a6b7a" stroke="${INK}" stroke-width="1.6"/>
-    <rect x="45" y="34" width="11" height="17" rx="4" fill="#5a6b7a" stroke="${INK}" stroke-width="1.6"/>
-    <path d="M24 46 q4 -6 0 -12 M29 49 q7 -9 0 -18 M34 52 q10 -12 0 -24" fill="none" stroke="${STAMP}" stroke-width="1.8" stroke-linecap="round"/>`,
-  disguise: `
-    <circle cx="20" cy="26" r="9" fill="#cfe3e8" stroke="${INK}" stroke-width="2.4"/>
-    <circle cx="44" cy="26" r="9" fill="#cfe3e8" stroke="${INK}" stroke-width="2.4"/>
-    <path d="M29 25 Q32 22 35 25" fill="none" stroke="${INK}" stroke-width="2.4"/>
-    <path d="M11 24 L4 21 M53 24 L60 21" stroke="${INK}" stroke-width="2.2" stroke-linecap="round"/>
-    <path d="M32 28 Q36 38 33 42 Q30 43 29 40" fill="${SKIN}" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/>
-    <path d="M16 48 Q24 41 32 46 Q40 41 48 48 Q40 51 32 48 Q24 51 16 48 Z" fill="${INK}"/>
-    <path d="M15 14 Q20 10 26 13 M38 13 Q44 10 49 14" stroke="${INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,
-  extract: `
-    <path d="M6 13 H58" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>
-    <path d="M32 13 V19" stroke="${INK}" stroke-width="2"/>
-    <path d="M14 34 Q14 20 30 19 H38 Q46 20 48 30 L48 36 Q46 40 40 40 H22 Q14 40 14 34 Z" fill="#46705a" stroke="${INK}" stroke-width="1.8"/>
-    <path d="M38 22 Q45 23 46 31 H36 Z" fill="#cfe3e8" stroke="${INK}" stroke-width="1.2"/>
-    <path d="M14 30 H2 L0 24" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"/>
-    <path d="M20 40 V46 M40 40 V46 M14 46 H48" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>
-    <path d="M30 46 V54" stroke="${INK}" stroke-width="1.2" stroke-dasharray="2 2"/>
-    <g transform="translate(30 58) scale(.42)">${agentShape('#555', '', { shadow: false })}</g>`,
+// Unified two-pixel pictograms: no generated character illustrations.
+const SYMBOLS = {
+  interrogate: '<path d="M8 10 H56 V43 H30 L18 54 V43 H8 Z"/><path d="M26 23 C26 14 42 14 40 24 C39 28 32 28 32 34"/><path d="M32 38 V39"/>',
+  arrest: '<circle cx="18" cy="39" r="11"/><circle cx="46" cy="25" r="11"/><path d="M28 34 L36 30 M12 24 H24 M40 10 H52"/>',
+  steal: '<path d="M8 16 H26 L32 22 H56 V52 H8 Z M18 37 H45 M38 30 L45 37 L38 44"/>',
+  trap: '<path d="M32 8 L58 54 H6 Z M32 24 V37 M32 44 V46"/>',
+  wiretap: '<path d="M12 39 V29 A20 20 0 0 1 52 29 V39"/><rect x="8" y="32" width="10" height="20" rx="3"/><rect x="46" y="32" width="10" height="20" rx="3"/><path d="M27 29 V43 M33 24 V48 M39 29 V43"/>',
+  disguise: '<rect x="8" y="10" width="48" height="44"/><circle cx="24" cy="26" r="6"/><path d="M14 44 Q24 29 34 44 M40 24 H49 M40 32 H49 M40 40 H49"/>',
+  extract: '<path d="M29 12 H10 V54 H29 M24 32 H56 M44 20 L56 32 L44 44"/>',
 };
+const CARD_ART = Object.fromEntries(Object.entries(SYMBOLS).map(([key, paths]) =>
+  [key, `<g fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</g>`]));
 
 export function cardArtSVG(type, cls = 'card-art') {
   return svg('0 0 64 64', CARD_ART[type] || '', cls);
@@ -224,29 +160,18 @@ export function compassSVG(x, y, r = 26) {
 
 // ---------- タイトルのイラスト ----------
 export function heroSVG() {
-  const routes = 'M10 120 Q90 60 170 100 T330 70';
   return svg('0 0 360 210', `
-    <defs>
-      <pattern id="hgrid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0 H0 V20" fill="none" stroke="#b9a77f" stroke-width=".5" opacity=".6"/></pattern>
-    </defs>
-    <rect x="0" y="0" width="360" height="210" fill="url(#hgrid)"/>
-    <path d="${routes}" fill="none" stroke="${STAMP}" stroke-width="1.6" stroke-dasharray="5 4" opacity=".6"/>
-    <circle cx="170" cy="100" r="4" fill="${STAMP}" opacity=".7"/><circle cx="330" cy="70" r="4" fill="${STAMP}" opacity=".7"/>
-    <g transform="translate(30 70) rotate(-8)">
-      <rect x="6" y="10" width="190" height="124" rx="4" fill="#000" opacity=".15"/>
-      <path d="M0 6 H64 L76 18 H190 V130 H0 Z" fill="${MANILA_D}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>
-      <rect x="0" y="22" width="190" height="108" rx="3" fill="${MANILA}" stroke="${INK}" stroke-width="2"/>
-      <rect x="14" y="36" width="96" height="8" rx="2" fill="${INK}" opacity=".25"/>
-      <rect x="14" y="52" width="70" height="6" rx="2" fill="${INK}" opacity=".18"/>
-      <rect x="14" y="64" width="84" height="6" rx="2" fill="${INK}" opacity=".18"/>
-      <g transform="rotate(-14 120 96)"><rect x="70" y="80" width="104" height="34" rx="4" fill="none" stroke="${STAMP}" stroke-width="3.5"/>
-      <text x="122" y="105" text-anchor="middle" font-size="22" fill="${STAMP}" font-family="'Dela Gothic One', sans-serif">極秘</text></g>
-      <rect x="128" y="30" width="44" height="54" fill="${PAPER}" stroke="${INK}" stroke-width="1.4" transform="rotate(6 150 57)"/>
-      <g transform="translate(150 62) rotate(6) scale(1.3)">${agentShape('#555', '', { shadow: false })}</g>
-      <path d="M126 28 l6 -8 l8 6" fill="none" stroke="#8d939a" stroke-width="3"/>
+    <rect width="360" height="210" fill="#e9e7df"/>
+    <path d="M24 44 H336 M24 174 H336" stroke="#242a2e"/>
+    <g fill="#242a2e" font-family="monospace">
+      <text x="24" y="30" font-size="10" letter-spacing="2">INTELLIGENCE BUREAU / 001</text>
+      <text x="24" y="82" font-size="11" letter-spacing="3">OPERATION</text>
+      <text x="20" y="133" font-size="48" font-weight="700" letter-spacing="-2">CLASSIFIED</text>
+      <text x="24" y="158" font-size="10">3 AGENTS. 1 IDENTITY. 2 FILES.</text>
+      <text x="24" y="194" font-size="9">ACCESS RESTRICTED</text>
     </g>
-    <g transform="translate(286 150) scale(3)">${agentShape('#c62828', '')}</g>
-    <g transform="translate(258 158)"><circle r="16" fill="#cfe3e8" opacity=".55" stroke="${INK}" stroke-width="3"/><path d="M11 11 L26 26" stroke="${INK}" stroke-width="6" stroke-linecap="round"/></g>`, 'hero-art');
+    <rect x="228" y="183" width="108" height="10" fill="#a53932"/>
+    <path d="M268 57 H336 M294 65 H336" stroke="#242a2e" stroke-width="5"/>`, 'hero-art');
 }
 
 // ---------- 遊び方のイラスト ----------

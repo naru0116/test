@@ -321,3 +321,27 @@ input, select {
   .turn-banner { font-size: 13px; }
   .steps li { font-size: 12px; padding: 1px 8px; }
 }
+
+/* Editorial intelligence dossier: restrained ink, paper and vermilion. */
+:root {
+  --desk: #20272b; --desk-2: #181e22;
+  --paper: #f5f4ee; --paper-2: #e9e7df;
+  --manila: #d3cebe; --manila-d: #b4ae9d;
+  --ink: #242a2e; --line: #c9c7bd;
+  --display: "Zen Kaku Gothic New", sans-serif;
+  --type: "Courier New", monospace;
+}
+body { background-image: none; }
+.hero { padding-top: 40px; padding-bottom: 30px; }
+.hero h1 { font-weight: 900; text-shadow: none; letter-spacing: -.04em; }
+.hero-art-wrap { transform: none; padding: 0; border-radius: 0; box-shadow: none; }
+button, input, select { border-radius: 2px; box-shadow: none; }
+.mode, .sheet { border-radius: 2px; box-shadow: none; }
+.mode { transform: none; }
+.music-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px max(16px, calc((100vw - 1148px) / 2)); background: #181e22; color: #f5f4ee; font-size: 12px; border-bottom: 1px solid #485055; }
+.music-title { font-family: var(--type); letter-spacing: .12em; margin-right: auto; }
+.music-controls button { color: #f5f4ee; background: transparent; border: 1px solid #949c9e; min-height: 36px; }
+.music-controls button:hover:not(:disabled) { background: #384247; }
+.music-controls input { width: 88px; accent-color: #c66458; }
+#music-status:empty { display: none; }
+@media (max-width: 480px) { .music-title { width: 100%; } }
