@@ -1,54 +1,67 @@
-// 別班ボードゲーム「機密ファイル争奪戦」ルールエンジン
+// 「機密ファイル争奪戦」ルールエンジン
 // DOM に依存しない純粋なロジック。ブラウザと Node の両方で動く。
 
 export const CITIES = [
-  { id: 'ny', name: 'ニューヨーク', x: 250, y: 150 },
-  { id: 'dc', name: 'ワシントン', x: 200, y: 240 },
-  { id: 'london', name: 'ロンドン', x: 450, y: 105 },
-  { id: 'berlin', name: 'ベルリン', x: 535, y: 135 },
-  { id: 'moscow', name: 'モスクワ', x: 650, y: 85 },
-  { id: 'istanbul', name: 'イスタンブール', x: 600, y: 215 },
-  { id: 'cairo', name: 'カイロ', x: 545, y: 310 },
-  { id: 'dubai', name: 'ドバイ', x: 690, y: 315 },
-  { id: 'beijing', name: '北京', x: 810, y: 165 },
-  { id: 'seoul', name: 'ソウル', x: 885, y: 215 },
-  { id: 'tokyo', name: '東京', x: 935, y: 285 },
-  { id: 'singapore', name: 'シンガポール', x: 815, y: 410 },
+  // 北ルート（西→東）
+  { id: 'ny', name: 'ニューヨーク', x: 245, y: 140 },
+  { id: 'london', name: 'ロンドン', x: 445, y: 100 },
+  { id: 'berlin', name: 'ベルリン', x: 535, y: 118 },
+  { id: 'moscow', name: 'モスクワ', x: 625, y: 85 },
+  { id: 'beijing', name: '北京', x: 800, y: 150 },
+  { id: 'tokyo', name: '東京', x: 905, y: 180 },
+  // 南ルート（西→東）
+  { id: 'rio', name: 'リオ', x: 330, y: 385 },
+  { id: 'casablanca', name: 'カサブランカ', x: 430, y: 225 },
+  { id: 'istanbul', name: 'イスタンブール', x: 575, y: 195 },
+  { id: 'dubai', name: 'ドバイ', x: 670, y: 275 },
+  { id: 'singapore', name: 'シンガポール', x: 790, y: 345 },
+  { id: 'sydney', name: 'シドニー', x: 910, y: 410 },
 ];
 
-// wrap: 地図の端をまたぐ航路（太平洋）
+// 北ルートと南ルートの2つの環を南北の道でつないだ形（どの都市からも道が3本）。
+// wrap: 地図の端をまたぐ太平洋航路
 export const EDGES = [
-  ['ny', 'dc'], ['ny', 'london'], ['dc', 'cairo'], ['london', 'berlin'],
-  ['berlin', 'moscow'], ['berlin', 'istanbul'], ['moscow', 'istanbul'],
-  ['istanbul', 'cairo'], ['istanbul', 'dubai'], ['cairo', 'dubai'],
-  ['moscow', 'beijing'], ['beijing', 'seoul'], ['seoul', 'tokyo'],
-  ['beijing', 'singapore'], ['dubai', 'singapore'], ['singapore', 'tokyo'],
-  ['dc', 'tokyo', 'wrap'],
+  ['ny', 'london'], ['london', 'berlin'], ['berlin', 'moscow'], ['moscow', 'beijing'], ['beijing', 'tokyo'], ['tokyo', 'ny', 'wrap'],
+  ['rio', 'casablanca'], ['casablanca', 'istanbul'], ['istanbul', 'dubai'], ['dubai', 'singapore'], ['singapore', 'sydney'], ['sydney', 'rio', 'wrap'],
+  ['ny', 'rio'], ['london', 'casablanca'], ['berlin', 'istanbul'], ['moscow', 'dubai'], ['beijing', 'singapore'], ['tokyo', 'sydney'],
 ];
 
-// 拠点はプレイヤー順にこの順で割り当てる（なるべく離れるように）
-export const BASE_ORDER = ['tokyo', 'london', 'ny', 'dubai', 'moscow', 'singapore'];
-export const COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00acc1'];
-export const COLOR_NAMES = ['赤', '青', '緑', '橙', '紫', '水'];
+// 人数ごとの拠点（どの拠点も条件が同じになる配置）。席順にこの順で割り当てる。
+export const BASE_SETS = {
+  2: ['tokyo', 'berlin'],
+  3: ['tokyo', 'london', 'moscow'],
+  4: ['tokyo', 'ny', 'berlin', 'moscow'],
+  5: ['tokyo', 'ny', 'london', 'berlin', 'moscow'],
+  6: ['tokyo', 'ny', 'london', 'berlin', 'moscow', 'beijing'],
+};
+export const COLORS = ['#c62828', '#1565c0', '#2e7d32', '#e8710a', '#6a1b9a', '#00838f'];
+export const COLOR_NAMES = ['赤', '青', '緑', '橙', '紫', '青緑'];
 export const AGENT_LABELS = ['A', 'B', 'C'];
 
 export const RULES = {
   actionsPerTurn: 2,
   handLimit: 5,
   startHand: 2,
+  marketSize: 3,
   carryLimit: 2,
   filesToWin: 2,
+  trapLimit: 2,
+  firstTurnActions: 1, // 先手有利を減らすため、最初の手番だけ行動1回
   maxRounds: 15,
-  logLimit: 80,
+  logLimit: 100,
 };
 
 export const CARDS = {
-  interrogate: { name: '尋問', count: 10, desc: '同じ都市にいる相手の工作員1人が本物か囮かを見る。' },
-  arrest: { name: '拘束', count: 8, desc: '同じ都市にいる相手の工作員1人を拠点へ送り返す。持っていたファイルはその都市に落ちる。相手の拠点では使えない。' },
-  disguise: { name: '偽装工作', count: 5, desc: '自分の工作員2人の正体（本物/囮）を入れ替える。相手が尋問で得た情報は無効になる。' },
-  wiretap: { name: '盗聴', count: 4, desc: '相手1人の手札をすべて見る。' },
-  extract: { name: '緊急脱出', count: 6, desc: '自分の工作員1人を自分の拠点へワープさせる。' },
+  interrogate: { name: '尋問', count: 7, short: '正体を見抜く', desc: '同じ都市にいる相手の工作員1人が本物か囮かを見る（結果は自分だけが知る）。' },
+  arrest: { name: '拘束', count: 6, short: '拠点へ送り返す', desc: '同じ都市にいる相手の工作員1人を拠点へ送り返す。持っていたファイルはその都市に落ちる。相手の拠点では使えない。' },
+  steal: { name: '奪取', count: 6, short: 'ファイルを1つ奪う', desc: '同じ都市にいる相手の工作員から、ファイルを1つ無作為に奪う。相手の拠点では使えない。' },
+  trap: { name: '罠', count: 6, short: '見えない罠を置く', desc: '自分の工作員がいる都市か隣の都市に、罠を伏せて置く。相手の工作員が移動で入ると拘束され、正体もわかる。置ける罠は2つまで（3つ目を置くと古い罠が消える）。拠点には置けない。' },
+  wiretap: { name: '盗聴', count: 4, short: '手札と罠を暴く', desc: '相手1人の手札をすべて見て、その人が置いている罠の場所も知る。' },
+  disguise: { name: '偽装工作', count: 4, short: '正体を入れ替える', desc: '自分の工作員2人の正体（本物/囮）を入れ替える。相手が尋問などで得た正体の情報は無効になる。' },
+  extract: { name: '緊急脱出', count: 5, short: '拠点へワープ', desc: '自分の工作員1人を自分の拠点へワープさせる（罠にはかからない）。' },
 };
+export const CARD_TYPES = Object.keys(CARDS);
+const DECK_SIZE = CARD_TYPES.reduce((n, t) => n + CARDS[t].count, 0);
 
 const ADJ = (() => {
   const m = {};
@@ -59,6 +72,20 @@ const ADJ = (() => {
 
 export const cityById = Object.fromEntries(CITIES.map((c) => [c.id, c]));
 export function neighbors(cityId) { return ADJ[cityId] || []; }
+
+// 全都市間の最短距離
+export const DIST = (() => {
+  const d = {};
+  for (const s of CITIES) {
+    d[s.id] = { [s.id]: 0 };
+    const q = [s.id];
+    while (q.length) {
+      const c = q.shift();
+      for (const n of ADJ[c]) if (d[s.id][n] === undefined) { d[s.id][n] = d[s.id][c] + 1; q.push(n); }
+    }
+  }
+  return d;
+})();
 
 function shuffle(arr, rng) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -75,12 +102,13 @@ function fail(msg) { throw new RuleError(msg); }
 
 // ---------- 生成 ----------
 
+// players: [{id, name, cpu?}]
 export function createGame(players, rng = Math.random) {
   const n = players.length;
   if (n < 2 || n > 6) fail('プレイ人数は2〜6人です');
 
   const ps = players.map((p, i) => ({
-    id: p.id, name: p.name, color: COLORS[i], base: BASE_ORDER[i], out: false,
+    id: p.id, name: p.name, color: COLORS[i], base: BASE_SETS[n][i], out: false, cpu: p.cpu || null,
   }));
 
   const agents = [];
@@ -103,12 +131,10 @@ export function createGame(players, rng = Math.random) {
   }
 
   const deck = [];
-  for (const [type, def] of Object.entries(CARDS)) {
-    for (let k = 0; k < def.count; k++) deck.push(type);
-  }
+  for (const type of CARD_TYPES) for (let k = 0; k < CARDS[type].count; k++) deck.push(type);
 
   const state = {
-    version: 1,
+    version: 2,
     status: 'playing',
     seq: 0,
     players: ps,
@@ -119,19 +145,29 @@ export function createGame(players, rng = Math.random) {
     fileDeck: shuffle(fileIds, rng),
     deck: shuffle(deck, rng),
     discard: [],
+    market: [],
     hands: ps.map(() => []),
-    knowledge: ps.map(() => ({ agents: {}, files: {} })),
-    turn: { player: 0, actionsLeft: RULES.actionsPerTurn, round: 1 },
+    traps: [],
+    trapSeq: 0,
+    knowledge: ps.map(() => ({ agents: {}, files: {}, traps: {} })),
+    turn: { player: 0, actionsLeft: RULES.actionsPerTurn, round: 1, phase: 'draw' },
     log: [],
+    last: null,
     winner: null,
   };
 
   refillFiles(state);
   for (let i = 0; i < n; i++) {
-    for (let k = 0; k < RULES.startHand; k++) drawCard(state, i, rng);
+    for (let k = 0; k < RULES.startHand; k++) {
+      const c = takeFromDeck(state, rng);
+      if (c) state.hands[i].push(c);
+    }
   }
-  addLog(state, `ゲーム開始！ ${n}人対戦。本物の工作員で本物の機密ファイルを${RULES.filesToWin}つ拠点へ持ち帰れ。`);
+  refillMarket(state, rng);
+  addLog(state, `作戦開始！ ${n}人対戦。本物の工作員で本物の機密ファイルを${RULES.filesToWin}つ拠点へ持ち帰れ。`);
   startTurn(state, rng);
+  state.turn.actionsLeft = RULES.firstTurnActions;
+  addLog(state, `先手の${ps[0].name}は、最初の手番だけ行動が${RULES.firstTurnActions}回。`);
   return state;
 }
 
@@ -144,16 +180,21 @@ function addLog(state, text, to) {
   if (state.log.length > RULES.logLimit) state.log.splice(0, state.log.length - RULES.logLimit);
 }
 
-function drawCard(state, p, rng) {
-  if (state.hands[p].length >= RULES.handLimit) return null;
+function takeFromDeck(state, rng) {
   if (state.deck.length === 0) {
     if (state.discard.length === 0) return null;
     state.deck = shuffle(state.discard, rng);
     state.discard = [];
   }
-  const c = state.deck.pop();
-  state.hands[p].push(c);
-  return c;
+  return state.deck.pop();
+}
+
+function refillMarket(state, rng) {
+  while (state.market.length < RULES.marketSize) {
+    const c = takeFromDeck(state, rng);
+    if (!c) break;
+    state.market.push(c);
+  }
 }
 
 export function isBase(state, cityId) {
@@ -208,6 +249,27 @@ export function knownFile(state, viewer, fileId) {
   return k === undefined ? null : k;
 }
 
+// viewer に見えている罠
+export function visibleTraps(state, viewer) {
+  return state.traps.filter((t) => state.status === 'finished' || t.owner === viewer
+    || (viewer >= 0 && state.knowledge[viewer].traps[t.id]));
+}
+
+// 罠の「気配」: 場所が分からない罠について、あり得る都市の範囲（公開情報）。
+// 罠は置いた工作員の都市か隣にしか置けないので、その範囲（拠点を除く）が候補になる。
+export function trapZone(state, trap) {
+  return [trap.around, ...neighbors(trap.around)].filter((c) => !isBase(state, c));
+}
+export function trapHints(state, viewer) {
+  const visible = new Set(visibleTraps(state, viewer).map((t) => t.id));
+  return state.traps.filter((t) => !visible.has(t.id)).map((t) => ({ id: t.id, owner: t.owner, cities: trapZone(state, t) }));
+}
+
+// 盤上にある各プレイヤーの罠の数（公開情報）
+export function trapCount(state, p) {
+  return state.traps.filter((t) => t.owner === p).length;
+}
+
 function realCount(state, fileIds) {
   return fileIds.filter((f) => state.files[f].real).length;
 }
@@ -216,12 +278,13 @@ function cityName(id) { return cityById[id].name; }
 
 // ---------- ターン進行 ----------
 
-function startTurn(state, rng) {
+function startTurn(state) {
   const p = state.turn.player;
   state.turn.actionsLeft = RULES.actionsPerTurn;
-  const c = drawCard(state, p, rng);
   addLog(state, `— ラウンド${state.turn.round}: ${state.players[p].name}の番 —`);
-  if (c) addLog(state, `カード「${CARDS[c].name}」を引いた。`, p);
+  const canDraw = state.hands[p].length < RULES.handLimit && (state.market.length > 0 || state.deck.length > 0 || state.discard.length > 0);
+  state.turn.phase = canDraw ? 'draw' : 'action';
+  if (!canDraw) addLog(state, '手札がいっぱいなので、カードは引けない。', p);
 }
 
 function activePlayers(state) {
@@ -258,8 +321,12 @@ function finishByScore(state) {
   const best = Math.max(...scores);
   const winners = act.filter((i, k) => scores[k] === best);
   state.status = 'finished';
-  state.winner = { players: winners, reason: `${RULES.maxRounds}ラウンド終了。本物のファイルを最も多く持っていたプレイヤーの勝利（${best}枚）。` };
-  addLog(state, `ゲーム終了: ${winners.map((i) => state.players[i].name).join('、')}の勝利！`);
+  state.winner = {
+    players: winners,
+    reason: `${RULES.maxRounds}ラウンドが終了。本物のファイルを最も多く持っていたプレイヤーの勝利（${best}枚）。`,
+    byScore: true,
+  };
+  addLog(state, `作戦終了: ${winners.map((i) => state.players[i].name).join('、')}の勝利！`);
 }
 
 function checkWin(state) {
@@ -268,7 +335,7 @@ function checkWin(state) {
     const ace = getAgent(state, state.aces[i]);
     if (ace.city === state.players[i].base && realCount(state, ace.files) >= RULES.filesToWin) {
       state.status = 'finished';
-      state.winner = { players: [i], reason: `${state.players[i].name}の本物の工作員（${ace.label}）が本物の機密ファイルを${RULES.filesToWin}つ拠点へ持ち帰った。` };
+      state.winner = { players: [i], reason: `${state.players[i].name}の本物の工作員（${ace.label}）が、本物の機密ファイルを${RULES.filesToWin}つ拠点へ持ち帰った。` };
       addLog(state, `任務完了！ ${state.players[i].name}の勝利！`);
       return true;
     }
@@ -281,6 +348,16 @@ function checkWin(state) {
     return true;
   }
   return false;
+}
+
+// 工作員を拘束して拠点へ送り返す（拘束カード・罠の共通処理）
+function sendHome(state, agent) {
+  const from = agent.city;
+  const dropped = agent.files.length;
+  state.cityFiles[from].push(...agent.files);
+  agent.files = [];
+  agent.city = state.players[agent.owner].base;
+  return { from, dropped };
 }
 
 // ---------- 離脱 ----------
@@ -298,8 +375,10 @@ export function forfeit(stateIn, p, reason = '離脱', rng = Math.random) {
     a.files = [];
     a.city = null;
   }
+  state.traps = state.traps.filter((t) => t.owner !== p);
   state.discard.push(...state.hands[p]);
   state.hands[p] = [];
+  state.last = null;
   addLog(state, `${state.players[p].name}が${reason}した。持っていたファイルはその場に残された。`);
   if (checkWin(state)) return state;
   if (state.turn.player === p) endTurn(state, rng);
@@ -308,11 +387,13 @@ export function forfeit(stateIn, p, reason = '離脱', rng = Math.random) {
 
 // ---------- アクション ----------
 // action:
+//  {type:'draw', from:'deck'|'market', index?}            … 手番の最初に1回
 //  {type:'move', agent, to}
+//  {type:'scout', agent, file}                             … ファイルを取らずに中身を見る
 //  {type:'infiltrate', agent, file?}
 //  {type:'drop', agent, file}
 //  {type:'transfer', agent, to(agentId), file}
-//  {type:'card', card(index in hand), agent?, target?, agent2?, player?}
+//  {type:'card', card(index in hand), agent?, target?, agent2?, player?, city?}
 //  {type:'endTurn'}
 //  {type:'resign'}
 
@@ -323,8 +404,18 @@ export function applyAction(stateIn, p, action, rng = Math.random) {
   const state = clone(stateIn);
   state.seq += 1;
   const me = state.players[p];
+  const type = action && action.type;
 
-  switch (action && action.type) {
+  if (state.turn.phase === 'draw') {
+    if (type !== 'draw') fail('まずカードを1枚引いてください（作戦本部か山札）');
+    drawAction(state, p, action, rng);
+    state.turn.phase = 'action';
+    return state;
+  }
+  if (type === 'draw') fail('カードはもう引きました');
+
+  state.last = null;
+  switch (type) {
     case 'endTurn':
       addLog(state, `${me.name}がターンを終了した。`);
       endTurn(state, rng);
@@ -332,9 +423,23 @@ export function applyAction(stateIn, p, action, rng = Math.random) {
 
     case 'move': {
       const a = ownAgent(state, p, action.agent);
-      if (!neighbors(a.city).includes(action.to)) fail('隣の都市にしか移動できません');
-      addLog(state, `${agentName(state, a.id)}が${cityName(a.city)}→${cityName(action.to)}へ移動。`);
+      if (!neighbors(a.city).includes(action.to)) fail('線でつながった隣の都市にしか移動できません');
+      const from = a.city;
+      addLog(state, `${agentName(state, a.id)}が${cityName(from)}→${cityName(action.to)}へ移動。`);
       a.city = action.to;
+      state.last = { type: 'move', agent: a.id, from, to: action.to };
+      triggerTrap(state, a);
+      break;
+    }
+
+    case 'scout': {
+      const a = ownAgent(state, p, action.agent);
+      const here = state.cityFiles[a.city];
+      if (!here.includes(action.file)) fail('そのファイルはこの都市にありません');
+      state.knowledge[p].files[action.file] = state.files[action.file].real;
+      addLog(state, `${agentName(state, a.id)}が${cityName(a.city)}のファイルを偵察した。`);
+      addLog(state, `偵察結果: ファイル#${action.file.slice(1)}は${state.files[action.file].real ? '本物の機密情報' : '偽情報'}だ。`, p);
+      state.last = { type: 'scout', agent: a.id, city: a.city };
       break;
     }
 
@@ -349,8 +454,9 @@ export function applyAction(stateIn, p, action, rng = Math.random) {
       here.splice(idx, 1);
       a.files.push(fileId);
       state.knowledge[p].files[fileId] = state.files[fileId].real;
-      addLog(state, `${agentName(state, a.id)}が${cityName(a.city)}で潜入し、ファイルを入手。`);
-      addLog(state, `入手したファイルの中身: ${state.files[fileId].real ? '本物の機密情報' : '偽情報'}`, p);
+      addLog(state, `${agentName(state, a.id)}が${cityName(a.city)}に潜入し、ファイルを入手。`);
+      addLog(state, `入手したファイル#${fileId.slice(1)}の中身: ${state.files[fileId].real ? '本物の機密情報' : '偽情報'}`, p);
+      state.last = { type: 'infiltrate', agent: a.id, city: a.city };
       break;
     }
 
@@ -361,6 +467,7 @@ export function applyAction(stateIn, p, action, rng = Math.random) {
       a.files.splice(idx, 1);
       state.cityFiles[a.city].push(action.file);
       addLog(state, `${agentName(state, a.id)}が${cityName(a.city)}にファイルを置いた。`);
+      state.last = { type: 'drop', agent: a.id, city: a.city };
       break;
     }
 
@@ -375,6 +482,7 @@ export function applyAction(stateIn, p, action, rng = Math.random) {
       a.files.splice(idx, 1);
       b.files.push(action.file);
       addLog(state, `${agentName(state, a.id)}が${agentName(state, b.id)}にファイルを渡した。`);
+      state.last = { type: 'transfer', agent: a.id, target: b.id, city: a.city };
       break;
     }
 
@@ -390,6 +498,39 @@ export function applyAction(stateIn, p, action, rng = Math.random) {
   state.turn.actionsLeft -= 1;
   if (state.turn.actionsLeft <= 0) endTurn(state, rng);
   return state;
+}
+
+function drawAction(state, p, action, rng) {
+  const me = state.players[p];
+  let card;
+  if (action.from === 'market') {
+    const i = action.index;
+    if (!Number.isInteger(i) || i < 0 || i >= state.market.length) fail('作戦本部のカードを選んでください');
+    card = state.market.splice(i, 1)[0];
+    refillMarket(state, rng);
+    addLog(state, `${me.name}が作戦本部から「${CARDS[card].name}」を取った。`);
+  } else {
+    card = takeFromDeck(state, rng);
+    if (!card) fail('山札がありません。作戦本部から選んでください');
+    addLog(state, `${me.name}が山札からカードを引いた。`);
+    addLog(state, `山札から「${CARDS[card].name}」を引いた。`, p);
+  }
+  state.hands[p].push(card);
+  state.last = { type: 'draw', player: p };
+}
+
+function triggerTrap(state, agent) {
+  const trap = state.traps.find((t) => t.city === agent.city && t.owner !== agent.owner);
+  if (!trap) return;
+  state.traps = state.traps.filter((t) => t.id !== trap.id);
+  const owner = state.players[trap.owner];
+  const city = agent.city;
+  const { dropped } = sendHome(state, agent);
+  const id = isAce(state, agent.id) ? 'ace' : 'decoy';
+  state.knowledge[trap.owner].agents[agent.id] = id;
+  addLog(state, `罠発動！ ${cityName(city)}で${agentName(state, agent.id)}が${owner.name}の罠にかかり拘束された。${dropped ? `ファイル${dropped}つがその場に落ちた。` : ''}`);
+  addLog(state, `罠の報告: ${agentName(state, agent.id)}は${id === 'ace' ? '★本物（エース）' : '囮'}だった。`, trap.owner);
+  state.last = { type: 'trap', agent: agent.id, city, owner: trap.owner };
 }
 
 function enemyAgentSameCity(state, p, mine, targetId) {
@@ -416,19 +557,61 @@ function playCard(state, p, action, rng) {
       state.knowledge[p].agents[t.id] = id;
       addLog(state, `【${cname}】${agentName(state, mine.id)}が${agentName(state, t.id)}を尋問した。`);
       addLog(state, `尋問結果: ${agentName(state, t.id)}は${id === 'ace' ? '★本物（エース）' : '囮'}だ。`, p);
+      state.last = { type: 'card', card: type, agent: mine.id, target: t.id, city: mine.city };
       break;
     }
     case 'arrest': {
       const mine = ownAgent(state, p, action.agent);
       const t = enemyAgentSameCity(state, p, mine, action.target);
-      const owner = state.players[t.owner];
-      if (t.city === owner.base) fail('相手の拠点にいる工作員は拘束できません');
-      const dropped = t.files.length;
-      const from = t.city;
-      state.cityFiles[from].push(...t.files);
-      t.files = [];
-      t.city = owner.base;
+      if (t.city === state.players[t.owner].base) fail('相手の拠点にいる工作員は拘束できません');
+      const { from, dropped } = sendHome(state, t);
       addLog(state, `【${cname}】${agentName(state, mine.id)}が${agentName(state, t.id)}を拘束！ 拠点へ送還。${dropped ? `ファイル${dropped}つが${cityName(from)}に落ちた。` : ''}`);
+      state.last = { type: 'card', card: type, agent: mine.id, target: t.id, city: from };
+      break;
+    }
+    case 'steal': {
+      const mine = ownAgent(state, p, action.agent);
+      const t = enemyAgentSameCity(state, p, mine, action.target);
+      if (t.city === state.players[t.owner].base) fail('相手の拠点では奪取できません');
+      if (t.files.length === 0) fail('相手はファイルを持っていません');
+      if (mine.files.length >= RULES.carryLimit) fail(`1人が持てるファイルは${RULES.carryLimit}つまでです`);
+      const k = Math.floor(rng() * t.files.length);
+      const f = t.files.splice(k, 1)[0];
+      mine.files.push(f);
+      state.knowledge[p].files[f] = state.files[f].real;
+      addLog(state, `【${cname}】${agentName(state, mine.id)}が${agentName(state, t.id)}からファイルを奪った！`);
+      addLog(state, `奪ったファイル#${f.slice(1)}の中身: ${state.files[f].real ? '本物の機密情報' : '偽情報'}`, p);
+      addLog(state, `奪われたファイル#${f.slice(1)}は${state.files[f].real ? '本物' : '偽物'}だった。`, t.owner);
+      state.last = { type: 'card', card: type, agent: mine.id, target: t.id, city: mine.city };
+      break;
+    }
+    case 'trap': {
+      const mine = ownAgent(state, p, action.agent);
+      const city = action.city;
+      if (city !== mine.city && !neighbors(mine.city).includes(city)) fail('罠は工作員がいる都市か隣の都市にしか置けません');
+      if (isBase(state, city)) fail('拠点には罠を置けません');
+      if (state.traps.some((t) => t.owner === p && t.city === city)) fail('そこにはもう罠を置いています');
+      const mineTraps = state.traps.filter((t) => t.owner === p);
+      if (mineTraps.length >= RULES.trapLimit) {
+        state.traps = state.traps.filter((t) => t.id !== mineTraps[0].id);
+        addLog(state, `${cityName(mineTraps[0].city)}の古い罠を回収した。`, p);
+      }
+      state.trapSeq += 1;
+      state.traps.push({ id: `t${state.trapSeq}`, owner: p, city, around: mine.city });
+      addLog(state, `【${cname}】${me.name}が${agentName(state, mine.id)}の近くに罠を仕掛けた（場所は秘密）。`);
+      addLog(state, `${cityName(city)}に罠を仕掛けた。`, p);
+      state.last = { type: 'card', card: type, agent: mine.id };
+      break;
+    }
+    case 'wiretap': {
+      const t = action.player;
+      if (!Number.isInteger(t) || t === p || !state.players[t] || state.players[t].out) fail('盗聴する相手を選んでください');
+      const h = state.hands[t];
+      const traps = state.traps.filter((x) => x.owner === t);
+      for (const x of traps) state.knowledge[p].traps[x.id] = true;
+      addLog(state, `【${cname}】${me.name}が${state.players[t].name}を盗聴した。`);
+      addLog(state, `盗聴結果: ${state.players[t].name}の手札は ${h.length ? h.map((c) => CARDS[c].name).join('・') : 'なし'}。罠は ${traps.length ? traps.map((x) => cityName(x.city)).join('・') : 'なし'}。`, p);
+      state.last = { type: 'card', card: type, player: t };
       break;
     }
     case 'disguise': {
@@ -443,22 +626,17 @@ function playCard(state, p, action, rng) {
         delete state.knowledge[i].agents[a.id];
         delete state.knowledge[i].agents[b.id];
       }
-      addLog(state, `【${cname}】${me.name}が${a.label}と${b.label}の正体を入れ替えた（かもしれない）。尋問情報はリセット。`);
-      break;
-    }
-    case 'wiretap': {
-      const t = action.player;
-      if (!Number.isInteger(t) || t === p || !state.players[t] || state.players[t].out) fail('盗聴する相手を選んでください');
-      const h = state.hands[t];
-      addLog(state, `【${cname}】${me.name}が${state.players[t].name}を盗聴した。`);
-      addLog(state, `盗聴結果: ${state.players[t].name}の手札は ${h.length ? h.map((c) => CARDS[c].name).join('・') : 'なし'}`, p);
+      addLog(state, `【${cname}】${me.name}が${a.label}と${b.label}の正体を入れ替えた（かもしれない）。正体の情報はリセット。`);
+      state.last = { type: 'card', card: type, agent: a.id, target: b.id };
       break;
     }
     case 'extract': {
       const a = ownAgent(state, p, action.agent);
       if (a.city === me.base) fail('すでに拠点にいます');
-      addLog(state, `【${cname}】${agentName(state, a.id)}が${cityName(a.city)}から拠点へ緊急脱出！`);
+      const from = a.city;
+      addLog(state, `【${cname}】${agentName(state, a.id)}が${cityName(from)}から拠点へ緊急脱出！`);
       a.city = me.base;
+      state.last = { type: 'move', agent: a.id, from, to: me.base, extract: true };
       break;
     }
     default:
@@ -468,17 +646,23 @@ function playCard(state, p, action, rng) {
   state.discard.push(type);
 }
 
-// ---------- 合法手の列挙（テスト・CPU用） ----------
+// ---------- 合法手の列挙（テスト・CPU・UI 用） ----------
 
 export function legalActions(state, p) {
   if (state.status !== 'playing' || state.turn.player !== p) return [];
+  if (state.turn.phase === 'draw') {
+    const out = state.market.map((c, index) => ({ type: 'draw', from: 'market', index }));
+    if (state.deck.length > 0 || state.discard.length > 0) out.push({ type: 'draw', from: 'deck' });
+    return out;
+  }
   const out = [{ type: 'endTurn' }];
   const mine = state.agents.filter((a) => a.owner === p && a.city);
   const enemies = state.agents.filter((a) => a.owner !== p && a.city);
   for (const a of mine) {
     for (const to of neighbors(a.city)) out.push({ type: 'move', agent: a.id, to });
-    if (a.files.length < RULES.carryLimit) {
-      for (const f of state.cityFiles[a.city]) out.push({ type: 'infiltrate', agent: a.id, file: f });
+    for (const f of state.cityFiles[a.city]) {
+      if (state.knowledge[p].files[f] === undefined) out.push({ type: 'scout', agent: a.id, file: f });
+      if (a.files.length < RULES.carryLimit) out.push({ type: 'infiltrate', agent: a.id, file: f });
     }
     for (const f of a.files) {
       out.push({ type: 'drop', agent: a.id, file: f });
@@ -490,12 +674,25 @@ export function legalActions(state, p) {
     }
   }
   state.hands[p].forEach((type, card) => {
-    if (type === 'interrogate' || type === 'arrest') {
+    if (state.hands[p].indexOf(type) !== card) return; // 同じ種類のカードは1枚分だけ列挙
+    if (type === 'interrogate' || type === 'arrest' || type === 'steal') {
       for (const a of mine) {
         for (const t of enemies) {
           if (t.city !== a.city) continue;
-          if (type === 'arrest' && t.city === state.players[t.owner].base) continue;
+          const atBase = t.city === state.players[t.owner].base;
+          if (type !== 'interrogate' && atBase) continue;
+          if (type === 'steal' && (t.files.length === 0 || a.files.length >= RULES.carryLimit)) continue;
           out.push({ type: 'card', card, agent: a.id, target: t.id });
+        }
+      }
+    } else if (type === 'trap') {
+      const seen = new Set();
+      for (const a of mine) {
+        for (const city of [a.city, ...neighbors(a.city)]) {
+          if (seen.has(city) || isBase(state, city)) continue;
+          if (state.traps.some((t) => t.owner === p && t.city === city)) continue;
+          seen.add(city);
+          out.push({ type: 'card', card, agent: a.id, city });
         }
       }
     } else if (type === 'disguise') {
@@ -510,3 +707,5 @@ export function legalActions(state, p) {
   });
   return out;
 }
+
+export { DECK_SIZE };
