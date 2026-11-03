@@ -1,6 +1,7 @@
 // マッチング（ランダムマッチ・ルーム）とオンライン対戦の進行管理
 
 import { createGame, applyAction, forfeit, RuleError } from './game.js';
+import { chooseAction } from './cpu.js';
 
 export const PUBLIC_WAIT_MS = 40_000; // ランダムマッチ: この時間が過ぎたら2人以上で開始
 const POINTER_TTL = 3 * 60_000;
@@ -277,26 +278,70 @@ export class OnlineGame {
   }
 }
 
-// 1台で回して遊ぶローカル対戦
+// 1台で遊ぶローカル対戦（CPU を混ぜられる）
+// seats: [{ name, cpu: null | 'easy' | 'normal' | 'hard' }]
 export class LocalGame {
-  constructor(names) {
+  constructor(seats, { cpuDelay = 900 } = {}) {
     this.kind = 'local';
-    this.state = createGame(names.map((name, i) => ({ id: `local${i}`, name })));
+    this.state = createGame(seats.map((s, i) => ({ id: `local${i}`, name: s.name, cpu: s.cpu || null })));
+    this.humans = this.state.players.map((p, i) => i).filter((i) => !this.state.players[i].cpu);
+    this.lastHuman = this.humans[0] ?? -1;
+    this.cpuDelay = cpuDelay;
     this.listeners = new Set();
+    this.timer = null;
+    this.closed = false;
+    this.schedule();
   }
 
   onState(cb) { this.listeners.add(cb); cb(this.state); return () => this.listeners.delete(cb); }
-  viewer() { return this.state.status === 'playing' ? this.state.turn.player : -1; }
+  emit() { for (const l of this.listeners) l(this.state); }
+
+  isCpu(i) { return !!this.state.players[i].cpu; }
+  cpuThinking() { return this.state.status === 'playing' && this.isCpu(this.state.turn.player); }
+
+  // 画面に表示する視点: 人間の手番ならその人、CPU の手番なら直前の人間
+  viewer() {
+    const cur = this.state.turn.player;
+    if (this.state.status === 'playing' && !this.isCpu(cur)) this.lastHuman = cur;
+    return this.lastHuman;
+  }
+
   isOnline() { return true; }
 
   async act(action) {
-    this.state = action.type === 'resign'
-      ? forfeit(this.state, this.state.turn.player, '投降')
-      : applyAction(this.state, this.state.turn.player, action);
-    for (const l of this.listeners) l(this.state);
+    const cur = this.state.turn.player;
+    if (action.type === 'resign') {
+      this.state = forfeit(this.state, this.viewer(), '投降');
+    } else {
+      if (this.isCpu(cur)) throw new RuleError('CPU の手番です');
+      this.state = applyAction(this.state, cur, action);
+    }
+    this.emit();
+    this.schedule();
   }
 
-  async close() {}
+  schedule() {
+    clearTimeout(this.timer);
+    if (this.closed || !this.cpuThinking()) return;
+    const delay = this.state.turn.phase === 'draw' ? this.cpuDelay * 0.7 : this.cpuDelay;
+    this.timer = setTimeout(() => this.stepCpu(), delay);
+  }
+
+  stepCpu() {
+    if (this.closed || !this.cpuThinking()) return;
+    const p = this.state.turn.player;
+    const action = chooseAction(this.state, p, this.state.players[p].cpu);
+    try {
+      this.state = action ? applyAction(this.state, p, action) : applyAction(this.state, p, { type: 'endTurn' });
+    } catch (e) {
+      console.error('CPU error', e, action);
+      this.state = applyAction(this.state, p, { type: 'endTurn' });
+    }
+    this.emit();
+    this.schedule();
+  }
+
+  async close() { this.closed = true; clearTimeout(this.timer); }
 }
 
 export { RuleError };
