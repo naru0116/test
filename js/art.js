@@ -80,7 +80,7 @@ const CARD_ART = Object.fromEntries(CARD_TYPES.map((key, i) => [key,
   `<svg width="64" height="64" viewBox="${(i % 4) * 100} ${Math.floor(i / 4) * 100} 100 100" overflow="hidden"><image href="assets/operations-atlas.webp" width="400" height="200"/></svg>`]));
 
 export function cardArtSVG(type, cls = 'card-art') {
-  return svg('0 0 64 64', CARD_ART[type] || '', cls);
+  return svg('0 0 64 64', CARD_ART[type] || '', cls, 'preserveAspectRatio="xMidYMid slice"');
 }
 
 // カードの裏（山札）

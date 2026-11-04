@@ -126,36 +126,52 @@
       <ol id="steps" class="steps" aria-label="手番の流れ"></ol>
       <div class="hud-buttons">
         <button id="btn-rules2" class="small"><span class="ico-slot" data-icon="book"></span>遊び方</button>
+        <button id="btn-sfx" class="small" aria-pressed="true">効果音 ON</button>
         <button id="btn-leave" class="small danger">退出</button>
+      </div>
+      <button id="btn-menu" class="small menu-btn" aria-expanded="false" aria-controls="game-menu">≡</button>
+      <div id="game-menu" class="game-menu" hidden>
+        <button data-menu="rules">遊び方を見る</button>
+        <button data-menu="bgm">BGM 再生</button>
+        <button data-menu="sfx">効果音・振動 ON</button>
+        <button data-menu="leave" class="danger">ゲームを終了する</button>
       </div>
     </div>
     <div class="game-main">
       <div class="board-col">
         <div id="coach" class="coach" role="status"></div>
+        <div id="mission" class="mission"></div>
         <div class="board-wrap">
-          <svg id="board" viewBox="0 0 1000 480" role="img" aria-label="作戦地図"></svg>
+          <svg id="board" viewBox="0 0 1000 480" role="img" aria-label="作戦地図" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="map-ctrl" aria-label="地図の操作">
+            <button data-zoom="in" aria-label="拡大">＋</button>
+            <button data-zoom="out" aria-label="縮小">－</button>
+            <button data-zoom="fit">全体</button>
+            <button data-zoom="me">自分</button>
+          </div>
         </div>
         <div class="legend" id="legend"></div>
       </div>
       <aside class="side">
-        <section class="sheet" id="market-panel">
+        <nav id="dock-tabs" class="dock-tabs" aria-label="パネル切り替え"></nav>
+        <section class="sheet" id="market-panel" data-panel="market">
           <h3><span class="ico-slot" data-icon="market"></span>作戦本部 <small class="muted">手番の最初に1枚引く</small></h3>
           <div id="market" class="market"></div>
         </section>
-        <section class="sheet">
+        <section class="sheet" data-panel="hand">
           <h3><span class="ico-slot" data-icon="cards"></span>あなたの手札 <small id="hand-count" class="muted"></small></h3>
           <div id="hand" class="hand"></div>
         </section>
-        <section class="sheet">
-          <h3><span class="ico-slot" data-icon="eye"></span>選択中</h3>
+        <section class="sheet" data-panel="action">
+          <h3><span class="ico-slot" data-icon="eye"></span>行動・選択中</h3>
           <div id="selection" class="selection"></div>
           <button id="btn-end" class="btn-primary wide"><span class="ico-slot" data-icon="end"></span>ターン終了</button>
         </section>
-        <section class="sheet">
+        <section class="sheet" data-panel="agents">
           <h3><span class="ico-slot" data-icon="person"></span>工作員リスト</h3>
           <ul id="players" class="players"></ul>
         </section>
-        <section class="sheet log-sheet">
+        <section class="sheet log-sheet" data-panel="log">
           <h3><span class="ico-slot" data-icon="lock"></span>作戦ログ</h3>
           <ol id="log" class="log"></ol>
         </section>
