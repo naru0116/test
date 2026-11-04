@@ -407,3 +407,6 @@ body { background: #101b20; }
 .card:disabled { opacity: 1; cursor: not-allowed; }
 .card:disabled b, .card:disabled small { opacity: .6; }
 @media (max-width: 760px) { .hero-art { transform: translateX(-48%); } }
+
+/* 機能スイッチ（js/features.js）でOFFのモードは表示しない */
+.mode[hidden] { display: none; }

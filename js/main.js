@@ -1,5 +1,6 @@
 import { connectDB } from './db.js';
 import { firebaseConfig } from './firebase-config.js';
+import { FEATURES } from './features.js';
 import {
   Lobby, WaitingRoom, OnlineGame, LocalGame, genId, normalizeRoomId,
 } from './online.js';
@@ -85,6 +86,7 @@ async function guard(btn, fn) {
   if (btn) btn.disabled = true;
   $('#title-msg').textContent = '';
   try {
+    if (!FEATURES.online) throw new Error('オンライン対戦は準備中です。「ひとりで遊ぶ」「1台でみんなで」で遊べます。');
     if (!lobby) throw new Error('オンライン対戦サーバー（Firebase）に接続できていません。通信環境を確認して再読み込みしてください。「ひとりで遊ぶ」「1台でみんなで」は使えます。');
     await fn();
   } catch (e) {
@@ -118,13 +120,21 @@ async function init() {
   syncLocal();
   $('#name').value = storageGet(localStorage, 'beppan-name') || '';
 
-  const params = new URLSearchParams(location.search);
-  if (params.get('room')) $('#room-id').value = normalizeRoomId(params.get('room'));
-
   bindTitle();
   bindWait();
   bindGame();
   bindRules();
+
+  // オンライン対戦は js/features.js の FEATURES.online で開放する
+  document.querySelectorAll('[data-feature="online"]').forEach((el) => { el.hidden = !FEATURES.online; });
+  document.querySelectorAll('.modes .mode:not([hidden]) .mode-tab').forEach((el, i) => { el.textContent = `FILE ${String(i + 1).padStart(2, '0')}`; });
+  if (!FEATURES.online) {
+    storageSet(sessionStorage, 'beppan-room', null);
+    return;
+  }
+
+  const params = new URLSearchParams(location.search);
+  if (params.get('room')) $('#room-id').value = normalizeRoomId(params.get('room'));
 
   try {
     db = await connectDB(firebaseConfig);
