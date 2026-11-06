@@ -541,3 +541,70 @@ body.is-mobile .market .card, body.is-mobile .hand .card { flex-basis: 136px; }
 body.is-mobile .hand .card .card-desc { display: none; }
 body.is-mobile .card b { font-size: 14px; }
 body.is-mobile .card small { font-size: 11px; }
+
+/* =========================================================
+   路線図（スマホ縦画面）・潜伏・推理メモ・作戦ポイント
+   ========================================================= */
+.rm-col { fill: #c8af80; font-size: 11px; letter-spacing: .2em; font-family: var(--type); }
+.rm-line { stroke: #d2bb89; stroke-width: 3; stroke-linecap: round; opacity: .75; fill: none; }
+.rm-line.wrap { stroke-dasharray: 6 5; stroke-width: 2.4; }
+.rm-wrap { fill: #c8af80; font-size: 10px; letter-spacing: .1em; }
+.rcity { cursor: pointer; }
+.rcity .rbox { fill: #eee9dc; stroke: #8c7d5c; stroke-width: 1.2; }
+.rcity.reach .rbox { fill: #fff6d6; stroke: #d39e1c; stroke-width: 3; animation: pulse 1.2s ease-in-out infinite; }
+.rcity.pick .rbox { fill: #fff0ec; stroke: var(--stamp); stroke-width: 3; stroke-dasharray: 6 4; }
+.rcity.focus .rbox { stroke: var(--stamp); stroke-width: 2.4; }
+.rm-name { font-size: 13px; font-weight: 900; fill: #1d2c30; }
+.rm-hq { font-size: 9.5px; font-weight: 700; }
+.rm-count { font-size: 11px; font-weight: 900; fill: #1d2c30; }
+.rm-more { font-size: 12px; font-weight: 900; fill: #1d2c30; }
+body.route-mode .board-wrap { background: #14262b; touch-action: none; }
+body.route-mode .map-ctrl [data-zoom]:not([data-zoom="mode"]) { display: none; }
+.map-ctrl .mode-btn { display: none; }
+body.is-mobile .map-ctrl .mode-btn { display: inline-flex; }
+body.route-mode .map-ctrl { left: auto; right: 6px; bottom: 6px; }
+.ghost { cursor: pointer; }
+.ghost rect { animation: pulse 1.6s ease-in-out infinite; }
+.agent.veiled .fig { opacity: .8; }
+.ghost-note { color: #6a1b9a; font-weight: 700; }
+.memo-row { margin-top: 8px; }
+.memo-row button.on { background: var(--ink); color: var(--paper); }
+.ops-btn { grid-column: 1 / -1; width: 100%; margin-bottom: 4px; font-size: 13px; background: #fff; border-style: dashed; }
+.ops-btn.on { background: var(--stamp); color: #fff; border-style: solid; }
+body.is-mobile .ops-btn { min-height: 38px; }
+.card.ops-pick { outline: 2px dashed var(--stamp); }
+.drag-ghost { position: fixed; z-index: 70; pointer-events: none; transform: translate(-50%, -60%) scale(1.3); filter: drop-shadow(0 6px 8px #0008); }
+.drag-ghost svg { width: 36px; height: 56px; }
+.detail-box .detail-art { width: 160px; height: 160px; aspect-ratio: 1; border-radius: 4px; display: block; margin: 0 auto 6px; }
+.detail-box p { text-align: left; }
+.dock-toggle { flex: 0 0 44px !important; font-size: 16px !important; color: var(--ink) !important; }
+body.is-mobile.dock-closed .side { height: auto; }
+body.is-mobile.dock-closed .side .sheet { display: none !important; }
+body.is-mobile.dock-closed.in-game .toast { bottom: 64px; }
+/* スマホ: 盤面の高さを確保する */
+body.is-mobile .coach { margin: 4px 6px 2px; padding: 4px 8px; font-size: 13px; line-height: 1.4; }
+body.is-mobile .coach .coach-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+body.is-mobile .coach .coach-sub { display: none; }
+body.is-mobile .coach svg.ico { width: 18px; height: 18px; }
+body.is-mobile .coach button { min-height: 34px; padding: 4px 8px; font-size: 12px; }
+body.is-mobile .mission { margin: 0 8px 2px; font-size: 11px; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; gap: 0 10px; }
+body.is-mobile .mission svg { width: 13px; height: 13px; }
+body.is-mobile .m-warn { font-size: 11px; padding: 0 6px; }
+body.is-mobile:not(.landscape) .side { height: 30vh; height: 30dvh; }
+body.is-mobile:not(.landscape).in-game .toast { bottom: calc(30dvh + 12px); }
+.rm-hq { font-size: 10px; font-weight: 900; }
+/* スマホ: 盤面とドックを横幅いっぱいに（PC用の align-items: start を打ち消す） */
+body.is-mobile .game-main { align-items: stretch; }
+/* 移動できる都市は点滅させず、太い金色の枠で示す（下の線路が透けないように） */
+.rcity.reach .rbox { animation: none; fill: #fff6d6; stroke: #d39e1c; stroke-width: 3.5; }
+/* 地図/路線図の切り替えボタンは小さく右上に */
+body.route-mode .map-ctrl { top: 2px; bottom: auto; right: 4px; }
+body.route-mode .map-ctrl .mode-btn { min-height: 22px; font-size: 10px; padding: 0 6px; opacity: .85; }
+/* ドックを畳んだときは、タブの高さだけにして盤面を広げる */
+body.is-mobile.dock-closed:not(.landscape) .side,
+body.is-mobile.dock-closed .side { height: auto; }
+.install { margin: 10px 0; padding: 10px 12px; border: 1px dashed #847b66; color: #e6dfcd; font-size: 13px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.install[hidden] { display: none; }
+.install button { color: var(--ink); }
+.tut-cards { display: flex; gap: 10px; justify-content: center; margin: 6px 0 10px; }
+.tut-cards svg { width: 110px; height: 110px; border-radius: 4px; }

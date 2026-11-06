@@ -2,7 +2,15 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101b20">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="機密ファイル">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <title>機密ファイル争奪戦</title>
   <meta name="description" content="2〜6人で遊べる諜報ボードゲーム。CPU対戦・オンライン対戦・ランダムマッチ対応。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -92,6 +100,10 @@
       </article>
     </div>
 
+    <div id="install" class="install" hidden>
+      <span id="install-text">ホーム画面に追加すると、アプリのように全画面で遊べます（オフラインでもCPU戦OK）。</span>
+      <button id="btn-install" hidden>ホーム画面に追加</button>
+    </div>
     <p id="title-msg" class="error center" role="alert"></p>
     <footer class="foot">このゲームはオリジナル作品です。実在の組織・作品とは関係ありません。</footer>
   </section>
@@ -148,6 +160,7 @@
             <button data-zoom="out" aria-label="縮小">－</button>
             <button data-zoom="fit">全体</button>
             <button data-zoom="me">自分</button>
+            <button data-zoom="mode" class="mode-btn">地図/路線図</button>
           </div>
         </div>
         <div class="legend" id="legend"></div>
@@ -160,6 +173,7 @@
         </section>
         <section class="sheet" data-panel="hand">
           <h3><span class="ico-slot" data-icon="cards"></span>あなたの手札 <small id="hand-count" class="muted"></small></h3>
+          <div id="hand-ops"></div>
           <div id="hand" class="hand"></div>
         </section>
         <section class="sheet" data-panel="action">
@@ -179,6 +193,11 @@
     </div>
     <div id="popup" class="popup" hidden></div>
   </section>
+
+  <!-- カードの詳しい説明（長押し） -->
+  <div id="detail" class="overlay" hidden>
+    <div class="overlay-box detail-box"></div>
+  </div>
 
   <!-- 端末受け渡し（1台で複数人） -->
   <div id="handoff" class="overlay" hidden>

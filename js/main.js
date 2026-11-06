@@ -9,6 +9,9 @@ import * as A from './art.js';
 import { LEVELS, cpuName, chooseAction } from './cpu.js';
 import { Camera, DEFAULT_SCALE } from './camera.js';
 import { sfx, sfxEnabled, setSfx } from './sfx.js';
+import {
+  routeMapSVG, agentTokenSVG, ghostTokenSVG, tokensByCity,
+} from './routemap.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -39,6 +42,8 @@ const isMobile = () => mqMobile.matches;
 // 画面の一時状態
 const ui = {
   tab: 'action', tabCtx: '', prevTurnKey: '', logSeenSeq: -1, menuOpen: false,
+  dockOpen: true, opsMode: false, memos: {}, suppressClickUntil: 0,
+  mapMode: storageGet(localStorage, 'beppan-map') || 'route',
   agent: null, city: null, flow: null, busy: false,
   seenSeq: null, freshUntil: 0, freshSeq: -1, prevSeq: -1,
 };
@@ -134,6 +139,8 @@ async function init() {
   bindGame();
   bindRules();
   bindMobile();
+  bindGestures();
+  setupPWA();
 
   // オンライン対戦は js/features.js の FEATURES.online で開放する
   document.querySelectorAll('[data-feature="online"]').forEach((el) => { el.hidden = !FEATURES.online; });
@@ -377,6 +384,9 @@ function bindGame() {
 
   $('#board').addEventListener('click', (e) => {
     if (camera && camera.shouldSuppressClick()) return;
+    if (Date.now() < ui.suppressClickUntil) return;
+    const gh = e.target.closest('[data-ghost-city]');
+    if (gh) { onCityClick(gh.dataset.ghostCity); return; }
     const t = e.target.closest('[data-agent]');
     if (t) { onAgentClick(t.dataset.agent); return; }
     const c = e.target.closest('[data-city]');
@@ -386,11 +396,18 @@ function bindGame() {
     const li = e.target.closest('[data-player]');
     if (li && ui.flow) flowPick('player', Number(li.dataset.player));
   });
+  $('#hand-ops').addEventListener('click', (e) => {
+    if (e.target.closest('#btn-ops')) { ui.opsMode = !ui.opsMode; ui.flow = null; render(); }
+  });
   $('#hand').addEventListener('click', (e) => {
+    if (Date.now() < ui.suppressClickUntil) return;
     const b = e.target.closest('[data-card]');
-    if (b) onCardClick(Number(b.dataset.card));
+    if (!b) return;
+    if (ui.opsMode) { ui.opsMode = false; act({ type: 'ops', card: Number(b.dataset.card) }); return; }
+    onCardClick(Number(b.dataset.card));
   });
   $('#market').addEventListener('click', (e) => {
+    if (Date.now() < ui.suppressClickUntil) return;
     const b = e.target.closest('[data-draw]');
     if (!b) return;
     if (b.dataset.draw === 'deck') act({ type: 'draw', from: 'deck' });
@@ -399,7 +416,7 @@ function bindGame() {
   $('#coach').addEventListener('click', (e) => {
     const b = e.target.closest('[data-coach]');
     if (!b) return;
-    if (b.dataset.coach === 'cancel') { ui.flow = null; render(); }
+    if (b.dataset.coach === 'cancel') { ui.flow = null; ui.opsMode = false; render(); }
     if (b.dataset.coach === 'deck') act({ type: 'draw', from: 'deck' });
     if (b.dataset.coach === 'end') act({ type: 'endTurn' });
     if (b.dataset.coach === 'speed' && game && game.kind === 'local') {
@@ -415,6 +432,13 @@ function bindGame() {
     const d = b.dataset;
     if (d.act === 'select') { selectAgent(d.agent, { frame: true }); return; }
     if (d.act === 'deselect') { ui.agent = null; ui.city = null; render(); return; }
+    if (d.act === 'memo') {
+      const v = viewer();
+      ui.memos[v] ||= {};
+      if (d.val) ui.memos[v][d.agent] = d.val; else delete ui.memos[v][d.agent];
+      render();
+      return;
+    }
     if (d.act === 'move') { act({ type: 'move', agent: d.agent, to: d.to }); return; }
     if (d.act === 'transfer') act({ type: 'transfer', agent: d.agent, to: d.to, file: d.file });
     else act({ type: d.act, agent: d.agent, file: d.file });
@@ -424,6 +448,137 @@ function bindGame() {
   });
 }
 
+// ---------- PWA（ホーム画面に追加・オフライン） ----------
+
+function setupPWA() {
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    navigator.serviceWorker.register('sw.js').catch((e) => console.warn('service worker', e));
+  }
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if (standalone || !isMobile()) return;
+  const box = $('#install');
+  let deferred = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferred = e;
+    box.hidden = false;
+    $('#btn-install').hidden = false;
+  });
+  $('#btn-install').onclick = async () => {
+    if (!deferred) return;
+    deferred.prompt();
+    await deferred.userChoice.catch(() => {});
+    deferred = null;
+    box.hidden = true;
+  };
+  // iPhone / iPad の Safari には追加ボタンがないので、手順を案内する
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+    $('#install-text').textContent = 'ホーム画面に追加すると、アプリのように全画面で遊べます：Safari の共有ボタン →「ホーム画面に追加」。';
+    box.hidden = false;
+  }
+}
+
+// ---------- 長押し・ドラッグ ----------
+
+function bindGestures() {
+  // 長押し: カードの詳しい説明 / 工作員の情報
+  let lp = null;
+  const startLP = (e) => {
+    const card = e.target.closest('#hand [data-card], #market [data-draw]');
+    if (!card || !state) return;
+    lp = {
+      x: e.clientX,
+      y: e.clientY,
+      timer: setTimeout(() => {
+        ui.suppressClickUntil = Date.now() + 600;
+        if (card.dataset.card !== undefined) showCardDetail(state.hands[viewer()][Number(card.dataset.card)], Number(card.dataset.card));
+        else if (card.dataset.draw !== 'deck') showCardDetail(state.market[Number(card.dataset.draw)], null);
+        lp = null;
+      }, 480),
+    };
+  };
+  const moveLP = (e) => { if (lp && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 10) { clearTimeout(lp.timer); lp = null; } };
+  const endLP = () => { if (lp) { clearTimeout(lp.timer); lp = null; } };
+  for (const el of [$('#hand'), $('#market')]) {
+    el.addEventListener('pointerdown', startLP);
+    el.addEventListener('pointermove', moveLP);
+    el.addEventListener('pointerup', endLP);
+    el.addEventListener('pointercancel', endLP);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  $('#detail').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-detail]');
+    if (e.target === $('#detail') || (b && b.dataset.detail === 'close')) { $('#detail').hidden = true; return; }
+    if (!b) return;
+    $('#detail').hidden = true;
+    if (b.dataset.detail === 'use') onCardClick(Number(b.dataset.card));
+    if (b.dataset.detail === 'ops') act({ type: 'ops', card: Number(b.dataset.card) });
+  });
+
+  // ドラッグで移動（路線図）: 自分の駒をつまんで、隣の都市で離す
+  const wrap = document.querySelector('.board-wrap');
+  let drag = null;
+  wrap.addEventListener('pointerdown', (e) => {
+    if (!state || !useRoute() || !actionPhase() || ui.flow) return;
+    // 駒そのもの、または自分の駒がいる都市の枠からドラッグを始められる（小さい駒を狙わなくて済むように）
+    const t = e.target.closest('[data-agent]');
+    let a = t && state.agents.find((x) => x.id === t.dataset.agent);
+    if (!a) {
+      const c = e.target.closest('[data-city]');
+      const mine = c && state.agents.filter((x) => x.owner === viewer() && x.city === c.dataset.city);
+      if (mine && mine.length) a = mine.find((x) => x.id === ui.agent) || mine[0];
+    }
+    if (!a || a.owner !== viewer()) return;
+    drag = { a, x: e.clientX, y: e.clientY, el: null, id: e.pointerId };
+  });
+  wrap.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag.el) {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 10) return;
+      try { wrap.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+      if (ui.agent !== drag.a.id) { ui.agent = drag.a.id; ui.city = null; render(); }
+      drag.el = document.createElement('div');
+      drag.el.className = 'drag-ghost';
+      drag.el.innerHTML = A.agentSVG(state.players[drag.a.owner].color, drag.a.label);
+      document.body.appendChild(drag.el);
+    }
+    drag.el.style.left = `${e.clientX}px`;
+    drag.el.style.top = `${e.clientY}px`;
+  });
+  const endDrag = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag;
+    drag = null;
+    if (!d.el) return;
+    d.el.remove();
+    ui.suppressClickUntil = Date.now() + 350;
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const c = hit && hit.closest('[data-city], [data-ghost-city]');
+    const to = c && (c.dataset.city || c.dataset.ghostCity);
+    if (to && G.neighbors(d.a.city).includes(to)) act({ type: 'move', agent: d.a.id, to });
+    else if (to && to !== d.a.city) toast('隣の都市（光っている都市）にしか移動できません');
+  };
+  wrap.addEventListener('pointerup', endDrag);
+  wrap.addEventListener('pointercancel', (e) => { if (drag && drag.el) drag.el.remove(); drag = null; void e; });
+}
+
+function showCardDetail(type, handIdx) {
+  if (!type) return;
+  const def = G.CARDS[type];
+  const legal = handIdx !== null && actionPhase() ? G.legalActions(state, viewer()) : [];
+  const hand = state.hands[viewer()] || [];
+  const usable = handIdx !== null && legal.some((a) => a.type === 'card' && hand[a.card] === type);
+  const canOps = handIdx !== null && legal.some((a) => a.type === 'ops');
+  $('#detail .detail-box').innerHTML = `${A.cardArtSVG(type, 'card-art detail-art')}<h2>${esc(def.name)}</h2><p>${esc(def.desc)}</p>
+    ${handIdx !== null ? `<p class="muted">作戦ポイントとして使うと: ${esc(G.OPS_DESC)}</p>` : '<p class="muted">作戦本部のカード。自分の手番の最初に取れます。</p>'}
+    <div class="row center-row">
+      ${usable ? `<button class="btn-primary" data-detail="use" data-card="${handIdx}">このカードを使う</button>` : ''}
+      ${canOps ? `<button data-detail="ops" data-card="${handIdx}">作戦ポイントにする（行動＋1）</button>` : ''}
+      <button data-detail="close">閉じる</button>
+    </div>`;
+  $('#detail').hidden = false;
+}
+
 // ---------- スマホ表示・地図カメラ・メニュー ----------
 
 function bindMobile() {
@@ -431,12 +586,24 @@ function bindMobile() {
   const applyMode = () => {
     document.body.classList.toggle('is-mobile', isMobile());
     document.body.classList.toggle('landscape', isMobile() && mqLandscape.matches);
-    camera.setEnabled(isMobile());
+    camera.setEnabled(isMobile() && !useRoute());
     if (state && game) { camera.needsInitialFocus = true; render(); }
   };
   mqMobile.addEventListener('change', applyMode);
   mqLandscape.addEventListener('change', applyMode);
-  window.addEventListener('resize', () => { if (camera.enabled) camera.apply(); });
+  window.addEventListener('resize', () => {
+    if (camera.enabled) camera.apply();
+  });
+  // 盤面の領域の大きさが変わったら描き直す（路線図は領域の大きさに合わせて配置するため）
+  let lastSize = '';
+  new ResizeObserver(() => {
+    const w = document.querySelector('.board-wrap');
+    const size = `${w.clientWidth}x${w.clientHeight}`;
+    if (size === lastSize) return;
+    lastSize = size;
+    if (!state || !game) return;
+    if (useRoute()) renderBoard(); else if (camera.enabled) camera.apply();
+  }).observe(document.querySelector('.board-wrap'));
   applyMode();
 
   document.querySelector('.map-ctrl').addEventListener('click', (e) => {
@@ -447,12 +614,27 @@ function bindMobile() {
     if (z === 'out') camera.zoom(1 / 1.3);
     if (z === 'fit') { camera.fitAll(); camera.userPanAt = Date.now(); }
     if (z === 'me') cycleMyAgent();
+    if (z === 'mode') {
+      ui.mapMode = useRoute() ? 'world' : 'route';
+      storageSet(localStorage, 'beppan-map', ui.mapMode);
+      camera.needsInitialFocus = true;
+      render();
+    }
   });
 
   $('#dock-tabs').addEventListener('click', (e) => {
+    if (e.target.closest('[data-dock]')) {
+      ui.dockOpen = !ui.dockOpen;
+      render();
+      if (useRoute()) requestAnimationFrame(() => renderBoard());
+      return;
+    }
     const b = e.target.closest('[data-tab]');
     if (!b) return;
+    const wasClosed = !ui.dockOpen;
+    ui.dockOpen = true;
     ui.tab = b.dataset.tab;
+    if (wasClosed && useRoute()) requestAnimationFrame(() => renderBoard());
     if (ui.tab === 'log' && state) ui.logSeenSeq = state.seq;
     render();
   });
@@ -506,8 +688,13 @@ function selectAgent(id, { frame = false } = {}) {
   ui.agent = id;
   ui.city = null;
   const a = state.agents.find((x) => x.id === id);
-  if (a && a.owner === viewer() && isMobile()) ui.tab = 'action';
-  if (frame && a && camera.enabled) frameAgent(a);
+  if (a && isMobile()) {
+    const opening = !ui.dockOpen;
+    ui.tab = 'action';
+    ui.dockOpen = true;
+    if (opening && useRoute()) requestAnimationFrame(() => { if (state) renderBoard(); });
+  }
+  if (frame && a && camera.enabled && seen(a)) frameAgent(a);
   render();
 }
 
@@ -573,6 +760,8 @@ const FLOWS = {
     { key: 'agent2', kind: 'own', prompt: '<b>2人目</b>を選んでください' },
   ],
   extract: [{ key: 'agent', kind: 'own', prompt: '拠点へ脱出させる<b>工作員</b>を選んでください' }],
+  hide: [{ key: 'agent', kind: 'own', prompt: '潜伏させる<b>自分の工作員</b>を選んでください' }],
+  checkpoint: [{ key: 'city', kind: 'city', prompt: '検問する<b>都市</b>を選んでください（？の影がある都市が狙い目）' }],
 };
 
 function flowLegal() {
@@ -751,7 +940,8 @@ function render() {
   if (!state || !game) return;
   const v = viewer();
 
-  if (ui.agent && !state.agents.some((a) => a.id === ui.agent && a.city)) ui.agent = null;
+  if (ui.agent && !state.agents.some((a) => a.id === ui.agent && a.city && seen(a))) ui.agent = null;
+  if (ui.opsMode && (!actionPhase() || (state.turn.opsUsed || 0) >= G.RULES.opsPerTurn)) ui.opsMode = false;
   if (ui.flow && (!actionPhase() || state.hands[v][ui.flow.card] !== ui.flow.type)) ui.flow = null;
 
   // 1台で複数人のとき: 手番交代の目隠し
@@ -771,8 +961,13 @@ function render() {
   renderBanner();
   renderCoach();
   renderMission();
+  const route = useRoute();
+  document.body.classList.toggle('route-mode', route);
+  camera.enabled = isMobile() && !route;
   renderBoard();
-  if (camera.enabled && camera.needsInitialFocus && v >= 0) {
+  if (route) {
+    // 路線図は viewBox を renderBoard で設定済み
+  } else if (camera.enabled && camera.needsInitialFocus && v >= 0) {
     camera.needsInitialFocus = false;
     camera.scale = DEFAULT_SCALE;
     const base = cityPt(state.players[v].base);
@@ -799,10 +994,12 @@ function autoTab() {
   const ctx = `${s.turn.round}-${s.turn.player}-${s.turn.phase}-${myTurn()}-${s.status}`;
   if (ctx === ui.tabCtx) return;
   ui.tabCtx = ctx;
-  if (s.status !== 'playing') ui.tab = 'log';
-  else if (!myTurn()) ui.tab = 'log';
-  else if (s.turn.phase === 'draw') ui.tab = 'market';
-  else ui.tab = 'action';
+  const prevOpen = ui.dockOpen;
+  if (s.status !== 'playing') { ui.tab = 'log'; ui.dockOpen = true; }
+  else if (!myTurn()) { ui.tab = 'log'; ui.dockOpen = false; } // 相手の番は地図を広く
+  else if (s.turn.phase === 'draw') { ui.tab = 'market'; ui.dockOpen = true; }
+  else { ui.tab = 'action'; ui.dockOpen = true; }
+  if (prevOpen !== ui.dockOpen && useRoute()) requestAnimationFrame(() => { if (state) renderBoard(); });
 }
 
 const TABS = [
@@ -824,7 +1021,9 @@ function renderDockTabs() {
     action: '',
     agents: ui.flow && flowCandidates().step && flowCandidates().step.kind === 'player' ? '<i class="dot-badge">!</i>' : '',
   };
-  $('#dock-tabs').innerHTML = TABS.map(([k, label]) => `<button data-tab="${k}" class="${ui.tab === k ? 'on' : ''}" aria-pressed="${ui.tab === k}">${label}${badge[k]}</button>`).join('');
+  $('#dock-tabs').innerHTML = TABS.map(([k, label]) => `<button data-tab="${k}" class="${ui.tab === k && ui.dockOpen ? 'on' : ''}" aria-pressed="${ui.tab === k}">${label}${badge[k]}</button>`).join('')
+    + `<button data-dock="toggle" class="dock-toggle" aria-label="${ui.dockOpen ? 'パネルを閉じる' : 'パネルを開く'}">${ui.dockOpen ? '▾' : '▴'}</button>`;
+  document.body.classList.toggle('dock-closed', isMobile() && !ui.dockOpen);
   document.querySelectorAll('.side .sheet[data-panel]').forEach((el) => el.classList.toggle('active', el.dataset.panel === ui.tab));
 }
 
@@ -843,7 +1042,7 @@ function renderMission() {
     + `<span class="m-item">本物ファイル <b class="pips">${pips}</b></span>`
     + `<span class="m-item">拠点まで <b>${dist}</b>マス</span>`;
   // 相手の要注意工作員: ファイル2つを抱えて拠点の近くにいる
-  const danger = s.agents.filter((a) => a.owner !== v && a.city && a.files.length >= G.RULES.filesToWin
+  const danger = s.agents.filter((a) => a.owner !== v && a.city && seen(a) && a.files.length >= G.RULES.filesToWin
     && G.DIST[a.city][s.players[a.owner].base] <= 2 && !s.players[a.owner].out);
   for (const a of danger.slice(0, 2)) {
     const d = G.DIST[a.city][s.players[a.owner].base];
@@ -898,6 +1097,9 @@ function renderCoach() {
   } else if (s.turn.phase === 'draw') {
     iconName = 'market';
     html = `<b>① カードを1枚引こう。</b><div class="coach-sub">${isMobile() ? '下の「本部」' : '右の作戦本部'}の表向きのカードから選ぶか、山札から引きます（山札は何が出るかわからない）。</div>`;
+  } else if (ui.opsMode) {
+    iconName = 'cards';
+    html = '<b>作戦ポイント:</b> 捨てるカードを手札から選んでください（行動が1回増えます）。<button data-coach="cancel" class="small">やめる</button>';
   } else if (ui.flow) {
     const { step } = flowCandidates();
     iconName = 'cards';
@@ -932,6 +1134,7 @@ function renderLegend() {
     `<span>${A.folderSVG('fake')}偽</span>`,
     `<span>${A.trapSVG('#555')}罠</span>`,
     `<span>${A.svgTiny('<circle r="8" fill="#6a1b9a"/><text y="4" text-anchor="middle" font-size="11" font-weight="900" fill="#fff">?</text>', '-9 -9 18 18')}罠があるかも</span>`,
+    `<span>${A.svgTiny('<rect x="-7" y="-9" width="14" height="18" rx="2" fill="none" stroke="#e6dfcd" stroke-width="1.5" stroke-dasharray="3 2"/><text y="4" text-anchor="middle" font-size="11" font-weight="900" fill="#e6dfcd">?</text>', '-9 -10 18 20')}潜伏中の相手がいるかも</span>`,
   ].join('');
 }
 
@@ -950,11 +1153,47 @@ const WRAP_ENDS = {
   'sydney-rio': [[1000, 440], [0, 425]],
 };
 
-function renderBoard() {
+// スマホ縦画面では「路線図」、それ以外は世界地図
+const useRoute = () => isMobile() && !mqLandscape.matches && ui.mapMode !== 'world';
+const seen = (a) => G.agentVisible(state, viewer(), a);
+
+function boardCtx() {
   const v = viewer();
   const s = state;
+  const sel = ui.agent && s.agents.find((a) => a.id === ui.agent);
+  const { step, ids: cands } = flowCandidates();
+  return {
+    s,
+    v,
+    sel: ui.agent,
+    reachable: new Set(sel && sel.owner === v && actionPhase() && !ui.flow ? G.neighbors(sel.city) : []),
+    cityPick: step && step.kind === 'city' ? cands : new Set(),
+    agentCands: step && (step.kind === 'own' || step.kind === 'enemy') ? cands : new Set(),
+    hints: G.trapHints(s, v),
+    traps: G.visibleTraps(s, v),
+    fresh: Date.now() < ui.freshUntil,
+    memos: ui.memos[v] || {},
+    focusCity: ui.city,
+  };
+}
+
+function renderBoard() {
+  const ctx = boardCtx();
+  if (useRoute()) {
+    const wrap = document.querySelector('.board-wrap');
+    const W = Math.max(280, wrap.clientWidth);
+    const H = Math.max(300, wrap.clientHeight);
+    const svg = $('#board');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = routeMapSVG(ctx, W, H);
+    return;
+  }
+  renderWorldMap(ctx);
+}
+
+function renderWorldMap(ctx) {
+  const { v, s, fresh } = ctx;
   const out = [];
-  const fresh = Date.now() < ui.freshUntil;
 
   out.push(`<defs><pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M50 0 H0 V50" fill="none" stroke="#335357" stroke-width="1"/></pattern></defs>
     <rect width="1000" height="480" fill="#172e34"/><rect width="1000" height="480" fill="url(#grid)" opacity=".7"/>`);
@@ -1006,12 +1245,7 @@ function renderBoard() {
   }
 
   // 選択中の工作員が動ける都市・カードの対象
-  const sel = ui.agent && s.agents.find((a) => a.id === ui.agent);
-  const reachable = new Set(sel && sel.owner === v && actionPhase() && !ui.flow ? G.neighbors(sel.city) : []);
-  const { step, ids: cands } = flowCandidates();
-  const cityPick = step && step.kind === 'city' ? cands : new Set();
-  const hints = G.trapHints(s, v);
-  const myTraps = G.visibleTraps(s, v);
+  const { reachable, cityPick, hints, traps: myTraps } = ctx;
 
   for (const c of G.CITIES) {
     const owner = s.players.find((p) => p.base === c.id);
@@ -1049,7 +1283,7 @@ function renderBoard() {
   }
 
   // 罠・拘束・奪取の演出
-  if (fresh && L && (L.type === 'trap' || (L.type === 'card' && (L.card === 'arrest' || L.card === 'steal'))) && L.city) {
+  if (fresh && L && (L.type === 'trap' || (L.type === 'card' && ['arrest', 'steal', 'checkpoint'].includes(L.card))) && L.city) {
     const c = G.cityById[L.city];
     const pts = [];
     for (let i = 0; i < 16; i++) {
@@ -1060,15 +1294,12 @@ function renderBoard() {
     out.push(`<polygon points="${pts.join(' ')}" fill="#ffd54f" stroke="#b3261e" stroke-width="3" class="burst"/>`);
   }
 
-  // 工作員
-  const byCity = {};
-  for (const a of s.agents) if (a.city) (byCity[a.city] ||= []).push(a);
-  const agentCands = step && (step.kind === 'own' || step.kind === 'enemy') ? cands : new Set();
+  // 工作員（潜伏中の相手は、いる可能性のある都市すべてに「影」を表示）
+  const byCity = tokensByCity(ctx);
   for (const [cityId, list] of Object.entries(byCity)) {
     const c = G.cityById[cityId];
-    list.sort((x, y) => (x.owner === v ? -1 : 0) - (y.owner === v ? -1 : 0) || x.owner - y.owner || x.label.localeCompare(y.label));
     const k = list.length;
-    list.forEach((a, i) => {
+    list.forEach((e, i) => {
       const ring = i < 5 ? 0 : 1;
       const inRing = ring === 0 ? Math.min(k, 5) : k - 5;
       const idx = ring === 0 ? i : i - 5;
@@ -1076,25 +1307,7 @@ function renderBoard() {
       const ang = inRing === 1 ? -Math.PI / 2 : (-150 + (120 * idx) / (inRing - 1)) * (Math.PI / 180);
       const x = c.x + r * Math.cos(ang);
       const y = c.y + r * Math.sin(ang) * 0.9 - 4;
-      const pl = s.players[a.owner];
-      const ident = G.knownIdentity(s, v, a.id);
-      const cls = ['agent'];
-      if (ui.agent === a.id) cls.push('sel');
-      if (agentCands.has(a.id)) cls.push('cand');
-      if (fresh && L && L.agent === a.id && L.type === 'move') cls.push('moved');
-      // 指でタップしやすいよう、見えない当たり判定を広めに取る
-      const parts = ['<rect x="-19" y="-30" width="38" height="56" fill="#000" fill-opacity="0"/>'];
-      if (ui.agent === a.id || agentCands.has(a.id)) parts.push('<ellipse cx="0" cy="20" rx="16" ry="6" class="glow"/>');
-      parts.push(`<g class="fig" transform="scale(1.25)">${A.agentShape(pl.color, a.label)}</g>`);
-      if (ident === 'ace') parts.push(A.aceBadge(13, -24, 6.2));
-      if (ident === 'decoy') parts.push(A.decoyBadge(13, -24, 6.2));
-      a.files.forEach((f, j) => {
-        const kf = G.knownFile(s, v, f);
-        parts.push(`<g transform="translate(${-26 + j * 4} ${2 - j * 3})">${A.folderShape(kf === true ? 'real' : kf === false ? 'fake' : 'unknown', 18)}</g>`);
-      });
-      const title = `${pl.name}の${a.label}${ident === 'ace' ? '（本物）' : ident === 'decoy' ? '（囮）' : ''}・ファイル${a.files.length}`;
-      // 位置は外側の g の transform 属性、アニメーションは内側の g（CSS の transform が位置を上書きしないように）
-      out.push(`<g class="${cls.join(' ')}" data-agent="${a.id}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><title>${esc(title)}</title><g class="bob">${parts.join('')}</g></g>`);
+      out.push(e.ghost ? ghostTokenSVG(ctx, e.a, x, y, 1.25, cityId) : agentTokenSVG(ctx, e.a, x, y, 1.25));
     });
   }
 
@@ -1125,10 +1338,16 @@ function renderHand() {
   const hand = state.hands[v];
   $('#hand-count').textContent = `${hand.length}/${G.RULES.handLimit}枚`;
   const legal = actionPhase() ? G.legalActions(state, v) : [];
-  if (!hand.length) { box.innerHTML = '<span class="muted empty">手札はありません。作戦本部からカードを引こう。</span>'; return; }
+  if (!hand.length) { $('#hand-ops').innerHTML = ''; box.innerHTML = '<span class="muted empty">手札はありません。作戦本部からカードを引こう。</span>'; return; }
+  const canOps = legal.some((a) => a.type === 'ops');
+  const opsBtn = canOps
+    ? `<button id="btn-ops" class="ops-btn ${ui.opsMode ? 'on' : ''}" title="${esc(G.OPS_DESC)}">${ui.opsMode ? '捨てるカードを選んでください（やめる）' : '作戦ポイント：1枚捨てて行動＋1'}</button>`
+    : '';
+  $('#hand-ops').innerHTML = opsBtn;
   box.innerHTML = hand.map((type, i) => {
     const usable = legal.some((a) => a.type === 'card' && hand[a.card] === type);
     const active = ui.flow && ui.flow.type === type && hand.indexOf(type) === i;
+    if (ui.opsMode) return cardButton(type, `data-card="${i}"`, { extraClass: 'ops-pick' });
     return cardButton(type, `data-card="${i}"`, { extraClass: active ? 'active' : '', disabled: !usable });
   }).join('');
 }
@@ -1175,6 +1394,15 @@ function renderSelection() {
     html += `<div class="sel-head">${A.agentSVG(pl.color, a.label)}<div><div class="who">${esc(pl.name)}の${a.label}</div><div class="ident">${identHtml}</div><div class="muted">現在地: ${esc(city.name)}</div></div>
       ${a.owner === v ? '<button data-act="deselect" class="small sel-back">← 一覧</button>' : ''}</div>`;
     html += `<div class="sel-files">所持ファイル: ${a.files.length ? a.files.map(fileTag).join('') : 'なし'}</div>`;
+    if (a.hidden && a.owner === v) html += `<div class="sel-sub">潜伏中（あと自分の手番${a.hidden.turns}回）。相手には候補${a.hidden.possible.length}都市としか見えていません。移動以外をすると姿を現します。</div>`;
+    // 推理メモ（相手の工作員で、正体がまだわからないとき）
+    if (a.owner !== v && !ident && v >= 0) {
+      const cur = (ui.memos[v] || {})[a.id];
+      html += `<div class="memo-row"><span class="act-label">推理メモ（自分だけに見える）</span><div class="actions">
+        <button data-act="memo" data-agent="${a.id}" data-val="ace" class="${cur === 'ace' ? 'on' : ''}">本物っぽい</button>
+        <button data-act="memo" data-agent="${a.id}" data-val="decoy" class="${cur === 'decoy' ? 'on' : ''}">囮っぽい</button>
+        ${cur ? `<button data-act="memo" data-agent="${a.id}" data-val="">メモを消す</button>` : ''}</div></div>`;
+    }
     if (a.owner === v && actionPhase() && !ui.flow) {
       // 移動先（罠の気配・判明している罠も表示）
       const hints = G.trapHints(s, v);
@@ -1210,7 +1438,11 @@ function renderSelection() {
   html += `<div class="sel-files">${esc(city.name)}のファイル: ${files.length ? files.map(fileTag).join('') : 'なし'}</div>`;
   const hint = G.trapHints(s, v).filter((h) => h.cities.includes(cityId));
   if (hint.length) html += `<div class="sel-sub">⚠ ${hint.map((h) => esc(s.players[h.owner].name)).join('・')}の罠があるかもしれない都市です。</div>`;
-  const here = s.agents.filter((x) => x.city === cityId);
+  const here = s.agents.filter((x) => x.city === cityId && seen(x));
+  const maybe = s.agents.filter((x) => !seen(x) && x.hidden && x.hidden.possible.includes(cityId));
+  if (maybe.length) {
+    html += `<div class="sel-sub ghost-note">？ 潜伏中かもしれない: ${maybe.map((x) => `${esc(s.players[x.owner].name)}の${x.label}（候補${x.hidden.possible.length}都市）`).join('、')}</div>`;
+  }
   if (here.length) {
     html += `<div class="chips">${here.map((x) => `<button data-act="select" data-agent="${x.id}">${A.agentSVG(s.players[x.owner].color)}${esc(s.players[x.owner].name)}の${x.label}</button>`).join('')}</div>`;
   }
@@ -1285,7 +1517,7 @@ const RULE_PAGES = [
   {
     title: '手番の流れ',
     art: () => A.tutorialArt('turn'),
-    html: '<ol><li><b>カードを1枚引く</b>: 作戦本部（表向きの3枚）から選ぶか、山札から引く。何を取るかで作戦が変わります。</li><li><b>行動を2回</b>: 移動（線でつながった隣の都市へ）・偵察・潜入・置く・渡す・カードを使う。</li><li><b>ターン終了</b>。行動を使い切ると自動で次の人へ。</li></ol><p class="muted">先手は最初の手番だけ行動が1回です。</p>',
+    html: '<ol><li><b>カードを1枚引く</b>: 作戦本部（表向きの3枚）から選ぶか、山札から引く。何を取るかで作戦が変わります。</li><li><b>行動を2回</b>: 移動（線でつながった隣の都市へ）・偵察・潜入・置く・渡す・カードを使う。</li><li><b>ターン終了</b>。行動を使い切ると自動で次の人へ。</li></ol><p><b>作戦ポイント</b>: 1ターンに1回、手札を1枚捨てて行動を1回増やせます。強いカードを温存するか、今ここで足として使うか。</p><p class="muted">先手は最初の手番だけ行動が1回です。</p>',
   },
   {
     title: 'カード',
@@ -1296,6 +1528,21 @@ const RULE_PAGES = [
     title: '罠と読み合い',
     art: () => A.tutorialArt('trap'),
     html: '<ul><li>罠を置くと、場所は秘密ですが「<b>この工作員のまわりのどこか</b>」だけは全員にわかります。地図には<b>？マーク</b>で表示されます。</li><li>本物がファイルを運ぶルートに罠があるかも…？ 盗聴すれば罠の場所がわかります。</li><li>相手が<b>偵察したのに取らなかった</b>ファイルは偽物かも。<b>2つ抱えて拠点に向かう</b>工作員は本物かも。ログを読んで推理しよう。</li></ul>',
+  },
+  {
+    title: '潜伏と検問',
+    art: () => `<div class="tut-cards">${A.cardArtSVG('hide', 'card-art')}${A.cardArtSVG('checkpoint', 'card-art')}</div>`,
+    html: '<ul><li><b>潜伏</b>: 自分の工作員1人の姿を消します（自分の手番2回分）。相手には「<b>いる可能性がある都市</b>」に<b>？の影</b>が出るだけ。移動するたびに影は広がります。</li><li>潜伏中は尋問・拘束・奪取の対象になりません（罠にはかかります）。移動以外の行動をすると姿を現します。</li><li><b>検問</b>: 都市を1つ調べます。潜伏中の相手がいれば姿を現し、いなければ「そこにはいない」と全員にわかって影が減ります。</li><li>本物がファイルを抱えて潜伏したら一大事。囮をわざと潜伏させて検問を空振りさせるハッタリも有効です。</li></ul>',
+  },
+  {
+    title: '推理メモ',
+    art: () => '',
+    html: '<p>相手の工作員をタップすると、「<b>本物っぽい</b>」「<b>囮っぽい</b>」の印を付けられます。印は<b>自分にしか見えません</b>。</p><p>ファイルを2つ抱えて拠点へ向かう、偵察したのに取らない、わざわざ潜伏する…。相手の動きから正体を推理して、拘束や奪取の狙いを決めましょう。</p>',
+  },
+  {
+    title: 'スマホでの操作',
+    art: () => '',
+    html: '<ul><li>縦画面では、盤面が<b>路線図</b>になります（左が北ルート、右が南ルート、外側の点線が太平洋航路）。右上のボタンで世界地図に切り替えられます。</li><li>自分の駒（または駒がいる都市）を<b>ドラッグして隣の都市で離す</b>と移動。タップして選び、光る都市をタップしてもOK。</li><li>カードを<b>長押し</b>すると詳しい説明。作戦ポイントにもできます。</li><li>下のパネル（本部・行動・手札・工作員・ログ）は手番に合わせて自動で開きます。▾で畳むと盤面が広くなります。</li><li>ホーム画面に追加すると全画面で遊べ、オフラインでもCPU戦ができます。</li></ul>',
   },
 ];
 let rulesPage = 0;

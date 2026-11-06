@@ -79,6 +79,29 @@ const CARD_TYPES = ['interrogate', 'arrest', 'steal', 'trap', 'wiretap', 'disgui
 const CARD_ART = Object.fromEntries(CARD_TYPES.map((key, i) => [key,
   `<svg width="64" height="64" viewBox="${(i % 4) * 100} ${Math.floor(i / 4) * 100} 100 100" overflow="hidden"><image href="assets/operations-atlas.webp" width="400" height="200"/></svg>`]));
 
+// 追加カード（潜伏・検問）: 画像アトラスにない分は、同じ暗い色調のベクター画で描く
+const NIGHT_BG = `<defs><radialGradient id="nbg" cx="50%" cy="35%" r="75%"><stop offset="0" stop-color="#2c3a3c"/><stop offset="1" stop-color="#0d1517"/></radialGradient></defs>
+  <rect width="64" height="64" fill="url(#nbg)"/>`;
+CARD_ART.hide = `${NIGHT_BG}
+  <ellipse cx="32" cy="58" rx="26" ry="5" fill="#000" opacity=".5"/>
+  <path d="M0 40 Q16 30 32 38 T64 34 V64 H0 Z" fill="#9aa9a6" opacity=".18"/>
+  <path d="M0 47 Q20 38 36 46 T64 42 V64 H0 Z" fill="#c9d3cf" opacity=".16"/>
+  <g opacity=".72">
+    <path d="M20 58 L23 30 Q32 24 41 30 L44 58 Z" fill="#141c1e" stroke="#c7b68e" stroke-width=".8" stroke-dasharray="2 1.5"/>
+    <circle cx="32" cy="22" r="6.5" fill="#141c1e" stroke="#c7b68e" stroke-width=".8" stroke-dasharray="2 1.5"/>
+    <path d="M21 18 Q32 12 43 18 L43 19.5 Q32 15 21 19.5 Z M26 17 L27 9 Q32 7 37 9 L38 17 Z" fill="#141c1e" stroke="#c7b68e" stroke-width=".6"/>
+  </g>
+  <circle cx="50" cy="12" r="4" fill="#e9d9a6" opacity=".85"/><circle cx="52" cy="11" r="3.4" fill="#253133"/>`;
+CARD_ART.checkpoint = `${NIGHT_BG}
+  <path d="M32 2 L18 64 H46 Z" fill="#f2dc9a" opacity=".16"/>
+  <rect x="9" y="38" width="4" height="22" fill="#3b4547"/><rect x="51" y="38" width="4" height="22" fill="#3b4547"/>
+  <g transform="rotate(-6 32 40)">
+    <rect x="6" y="36" width="52" height="7" rx="1.5" fill="#e9e3d2"/>
+    <path d="M12 36 h7 l-5 7 h-7 z M26 36 h7 l-5 7 h-7 z M40 36 h7 l-5 7 h-7 z M54 36 h4 v7 h-9 z" fill="#a33a30"/>
+  </g>
+  <circle cx="32" cy="12" r="5" fill="#f2dc9a"/><path d="M28 16 L24 22 H40 L36 16" fill="#3b4547"/>
+  <circle cx="13" cy="33" r="2.3" fill="#e05a4c"/><circle cx="51" cy="33" r="2.3" fill="#e05a4c"/>`;
+
 export function cardArtSVG(type, cls = 'card-art') {
   return svg('0 0 64 64', CARD_ART[type] || '', cls, 'preserveAspectRatio="xMidYMid slice"');
 }

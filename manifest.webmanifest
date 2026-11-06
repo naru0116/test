@@ -1,0 +1,16 @@
+{
+  "name": "機密ファイル争奪戦",
+  "short_name": "機密ファイル",
+  "description": "本物の工作員で、本物の機密ファイルを持ち帰れ。2〜6人の諜報ボードゲーム。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101b20",
+  "theme_color": "#101b20",
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
