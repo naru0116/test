@@ -21,7 +21,11 @@ function view(state, p) {
   const ace = mine.find((a) => a.id === state.aces[p]);
   const fileVal = (f) => (know.files[f] === undefined ? null : know.files[f]);
   const realIn = (a) => a.files.filter((f) => fileVal(f) === true).length;
-  const enemies = state.agents.filter((a) => a.owner !== p && a.city);
+  // 見えている相手だけ（潜伏中の相手の本当の居場所は使わない）
+  const enemies = state.agents.filter((a) => a.owner !== p && a.city && !a.hidden);
+  // 潜伏中の相手: 公開されている「いる可能性のある都市」だけを使う
+  const hiddenEnemies = state.agents.filter((a) => a.owner !== p && a.city && a.hidden)
+    .map((a) => ({ id: a.id, owner: a.owner, files: a.files.length, possible: a.hidden.possible }));
   const enemyTraps = new Set(state.traps.filter((t) => t.owner !== p && know.traps[t.id]).map((t) => t.city));
   const myTraps = new Set(state.traps.filter((t) => t.owner === p).map((t) => t.city));
   // 自分の本物が誰かに調べられたか（尋問・罠の対象になったことはログで公開される。結果の中身は見ない）
@@ -40,7 +44,7 @@ function view(state, p) {
     for (const c of h.cities) trapRisk[c] = (trapRisk[c] || 0) + 1 / h.cities.length;
   }
   return {
-    p, me, know, mine, ace, fileVal, realIn, enemies, enemyTraps, myTraps, aceExposed, targets, knownRealCities, enemyIdent, trapRisk,
+    p, me, know, mine, ace, fileVal, realIn, enemies, hiddenEnemies, enemyTraps, myTraps, aceExposed, targets, knownRealCities, enemyIdent, trapRisk,
   };
 }
 
@@ -92,6 +96,8 @@ function scoreDraw(state, v, action) {
     case 'interrogate': return 12 - (has('interrogate') ? 5 : 0);
     case 'disguise': return (v.aceExposed && !has('disguise') ? 30 : 4);
     case 'wiretap': return 8 + (state.traps.some((t) => t.owner !== v.p && !v.know.traps[t.id]) ? 6 : 0) - (has('wiretap') ? 6 : 0);
+    case 'hide': return 10 + (aceReal >= 1 ? 16 : 0) - (has('hide') ? 8 : 0);
+    case 'checkpoint': return 7 + (v.hiddenEnemies.some((h) => h.files) ? 16 : v.hiddenEnemies.length ? 6 : 0) - (has('checkpoint') ? 6 : 0);
     default: return 10;
   }
 }
@@ -140,7 +146,20 @@ function scoreMove(state, v, a, to) {
   return s;
 }
 
+// 潜伏中の自分の工作員が、姿を現してしまう行動をするときの減点
+function revealCost(state, v, act) {
+  const ids = [act.agent, act.type === 'transfer' ? act.to : null].filter(Boolean);
+  const own = ids.map((id) => state.agents.find((x) => x.id === id)).filter((a) => a && a.owner === v.p && a.hidden);
+  if (!own.length) return 0;
+  if (act.type === 'move' || (act.type === 'card' && state.hands[v.p][act.card] === 'disguise')) return 0;
+  return 18 * own.length;
+}
+
 function scoreAction(state, v, act) {
+  return scoreActionRaw(state, v, act) - revealCost(state, v, act);
+}
+
+function scoreActionRaw(state, v, act) {
   const ag = (id) => state.agents.find((x) => x.id === id);
   switch (act.type) {
     case 'draw': return scoreDraw(state, v, act);
@@ -240,9 +259,33 @@ function scoreCard(state, v, act) {
       if (!isAce && v.realIn(a) > 0 && v.ace && v.ace.city === v.me.base) return 18 + d * 5;
       return -30;
     }
+    case 'hide': {
+      const a = ag(act.agent);
+      const isAce = v.ace && a.id === v.ace.id;
+      const near = v.enemies.filter((t) => dist(t.city, a.city) <= 2 && t.city !== state.players[t.owner].base).length;
+      const risky = [a.city, ...neighbors(a.city)].some((c) => (v.trapRisk[c] || 0) > 0.2);
+      // 本物が本物ファイルを抱えて帰るときに、追っ手や罠から身を隠す
+      if (isAce && aceReal >= RULES.filesToWin) return 34 + near * 8 + (risky ? 10 : 0) + (v.aceExposed ? 10 : 0) + Math.min(3, dist(a.city, v.me.base)) * 4 - 14;
+      if (isAce) return (aceReal >= 1 ? 4 : -10) + near * 4 + (v.aceExposed ? 8 : 0) - 14;
+      // 囮がファイルを抱えて潜伏 → 相手の検問を空振りさせるハッタリ
+      if (a.files.length) return 4 + near * 3 + (v.L.read ? 6 : 0) - 14;
+      return -25;
+    }
+    case 'checkpoint': {
+      let val = 0;
+      for (const h of v.hiddenEnemies) {
+        if (h.possible.includes(act.city)) val += (10 + h.files * 18) / h.possible.length;
+      }
+      return val - 12;
+    }
     default: return -10;
   }
 }
+
+// カードを作戦ポイント（行動+1）に変えるときに失う価値の目安
+const KEEP = {
+  arrest: 18, steal: 16, trap: 14, hide: 14, extract: 12, interrogate: 10, checkpoint: 10, disguise: 6, wiretap: 6,
+};
 
 // 1手を選ぶ
 export function chooseAction(state, p, level = 'normal', rng = Math.random) {
@@ -258,10 +301,23 @@ export function chooseAction(state, p, level = 'normal', rng = Math.random) {
   }
   let best = acts[0];
   let bestScore = -Infinity;
-  for (const a of acts) {
-    const s = scoreAction(state, v, a) + rng() * L.noise;
-    if (s > bestScore) { bestScore = s; best = a; }
-  }
+  // 作戦ポイント以外の手を先に評価し、その最善手の価値から「行動を1回増やす価値」を見積もる
+  let bestOther = 0;
+  const scored = acts.map((a) => {
+    if (a.type === 'ops') return null;
+    const sc = scoreAction(state, v, a);
+    if (a.type !== 'endTurn' && a.type !== 'draw') bestOther = Math.max(bestOther, sc);
+    return sc;
+  });
+  acts.forEach((a, i) => {
+    let sc = scored[i];
+    if (a.type === 'ops') {
+      const type = state.hands[p][a.card];
+      sc = bestOther * 0.55 - (KEEP[type] ?? 10) - (state.turn.actionsLeft >= 2 ? 6 : 0);
+    }
+    sc += rng() * L.noise;
+    if (sc > bestScore) { bestScore = sc; best = a; }
+  });
   return best;
 }
 

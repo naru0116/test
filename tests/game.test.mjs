@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGame, applyAction, legalActions, forfeit, RULES, CITIES, neighbors, knownIdentity,
-  visibleTraps, trapHints, DECK_SIZE, BASE_SETS, DIST,
+  visibleTraps, trapHints, DECK_SIZE, BASE_SETS, DIST, agentVisible,
 } from '../js/game.js';
 import { chooseAction } from '../js/cpu.js';
 
@@ -39,6 +39,13 @@ function checkInvariants(s) {
   // 罠は1人2つまで、拠点には置かれない
   s.players.forEach((p, i) => assert.ok(s.traps.filter((t) => t.owner === i).length <= RULES.trapLimit));
   s.traps.forEach((t) => assert.ok(!s.players.some((p) => p.base === t.city)));
+  // 潜伏中の工作員の本当の居場所は、公開されている候補に必ず含まれる
+  for (const a of s.agents) {
+    if (!a.hidden) continue;
+    assert.ok(a.city, 'hidden agent must be on board');
+    assert.ok(a.hidden.possible.includes(a.city), `${a.id} at ${a.city} not in ${a.hidden.possible}`);
+    assert.ok(a.hidden.turns >= 1);
+  }
 }
 
 // 手番の最初にカードを引いて行動フェーズにする
@@ -317,4 +324,119 @@ test('離脱で残り1人になると勝利', () => {
   assert.equal(s.status, 'finished');
   assert.deepEqual(s.winner.players, [2]);
   assert.equal(s.agents.filter((a) => a.owner === 0 && a.city).length, 0);
+});
+
+test('潜伏: 相手からは候補の都市だけが見え、移動のたびに候補が広がる', () => {
+  let s = toAction(createGame(players(2), seeded(21)));
+  const a = s.agents.find((x) => x.owner === 0);
+  s.hands[0] = ['hide'];
+  s = applyAction(s, 0, { type: 'card', card: 0, agent: a.id });
+  let ag = s.agents.find((x) => x.id === a.id);
+  assert.deepEqual(ag.hidden.possible, ['tokyo']);
+  assert.equal(agentVisible(s, 1, ag), false);
+  assert.equal(agentVisible(s, 0, ag), true);
+  s = applyAction(s, 0, { type: 'move', agent: a.id, to: 'beijing' });
+  ag = s.agents.find((x) => x.id === a.id);
+  assert.deepEqual([...ag.hidden.possible].sort(), [...neighbors('tokyo')].sort());
+  // 公開ログに行き先は出ない（本人向けの秘密ログには出る）
+  assert.ok(!s.log.some((l) => l.to === undefined && l.text.includes('北京へ')));
+  assert.ok(s.log.some((l) => l.to === 0 && l.text.includes('北京')));
+  assert.equal(s.last.type, 'hiddenMove');
+});
+
+test('潜伏中は尋問・拘束・奪取の対象にならず、期限が来ると姿を現す', () => {
+  let s = toAction(createGame(players(2), seeded(22)));
+  const a = s.agents.find((x) => x.owner === 0);
+  s.hands[0] = ['hide'];
+  s = applyAction(s, 0, { type: 'card', card: 0, agent: a.id });
+  s = toAction(applyAction(s, 0, { type: 'endTurn' }));
+  const e = s.agents.find((x) => x.owner === 1);
+  e.city = 'tokyo';
+  s.hands[1] = ['arrest', 'interrogate'];
+  assert.ok(!legalActions(s, 1).some((x) => x.type === 'card' && x.target === a.id));
+  assert.throws(() => applyAction(s, 1, { type: 'card', card: 0, agent: e.id, target: a.id }), /潜伏中/);
+  // 自分の手番2回目の終わりで姿を現す
+  s = toAction(applyAction(s, 1, { type: 'endTurn' }));
+  assert.ok(s.agents.find((x) => x.id === a.id).hidden);
+  s = applyAction(s, 0, { type: 'endTurn' });
+  assert.equal(s.agents.find((x) => x.id === a.id).hidden, null);
+});
+
+test('潜伏中に移動以外をすると姿を現す。罠にはかかる', () => {
+  let s = toAction(createGame(players(2), seeded(23)));
+  const a = s.agents.find((x) => x.owner === 0);
+  a.city = 'istanbul';
+  s.hands[0] = ['hide'];
+  s.turn.actionsLeft = 5;
+  s = applyAction(s, 0, { type: 'card', card: 0, agent: a.id });
+  const f = s.cityFiles.istanbul[0];
+  s = applyAction(s, 0, { type: 'infiltrate', agent: a.id, file: f });
+  assert.equal(s.agents.find((x) => x.id === a.id).hidden, null);
+
+  // 罠
+  s = toAction(applyAction(s, 0, { type: 'endTurn' }));
+  const e = s.agents.find((x) => x.owner === 1);
+  e.city = 'dubai';
+  s.hands[1] = ['hide'];
+  s.traps.push({ id: 'tx', owner: 0, city: 'singapore', around: 'singapore' });
+  s = applyAction(s, 1, { type: 'card', card: 0, agent: e.id });
+  s = applyAction(s, 1, { type: 'move', agent: e.id, to: 'singapore' });
+  const e2 = s.agents.find((x) => x.id === e.id);
+  assert.equal(e2.hidden, null);
+  assert.equal(e2.city, s.players[1].base);
+});
+
+test('検問: 見つければ姿を現し、外れれば候補から除外される', () => {
+  let s = toAction(createGame(players(2), seeded(24)));
+  s = toAction(applyAction(s, 0, { type: 'endTurn' }));
+  const e = s.agents.find((x) => x.owner === 1);
+  e.city = 'istanbul';
+  s.hands[1] = ['hide'];
+  s = applyAction(s, 1, { type: 'card', card: 0, agent: e.id });
+  s = applyAction(s, 1, { type: 'move', agent: e.id, to: 'dubai' }); // 行動2回で手番は自動で終わる
+  s = toAction(s, 0);
+  let h = s.agents.find((x) => x.id === e.id).hidden;
+  assert.ok(h.possible.includes('casablanca'));
+  s.hands[0] = ['checkpoint', 'checkpoint'];
+  s = applyAction(s, 0, { type: 'card', card: 0, city: 'casablanca' });
+  h = s.agents.find((x) => x.id === e.id).hidden;
+  assert.ok(h && !h.possible.includes('casablanca'));
+  s = applyAction(s, 0, { type: 'card', card: 0, city: 'dubai' });
+  assert.equal(s.agents.find((x) => x.id === e.id).hidden, null);
+});
+
+test('作戦ポイント: カードを捨てて行動+1、1ターンに1回まで', () => {
+  let s = toAction(createGame(players(2), seeded(25)));
+  s.hands[0] = ['wiretap', 'arrest'];
+  const before = s.turn.actionsLeft;
+  s = applyAction(s, 0, { type: 'ops', card: 0 });
+  assert.equal(s.turn.actionsLeft, before + 1);
+  assert.deepEqual(s.hands[0], ['arrest']);
+  assert.ok(!legalActions(s, 0).some((x) => x.type === 'ops'));
+  assert.throws(() => applyAction(s, 0, { type: 'ops', card: 0 }), /もう使いました/);
+});
+
+test('CPUは潜伏中の相手の本当の居場所を見ない（居場所を変えても選ぶ手が同じ）', () => {
+  let diffs = 0;
+  for (let g = 0; g < 40; g++) {
+    let s = toAction(createGame(players(2), seeded(300 + g)));
+    s = toAction(applyAction(s, 0, { type: 'endTurn' }));
+    const e = s.agents.find((x) => x.owner === 1);
+    e.city = 'istanbul';
+    e.files = [s.cityFiles.istanbul.pop()];
+    s.hands[1] = ['hide'];
+    s = applyAction(s, 1, { type: 'card', card: 0, agent: e.id });
+    s = applyAction(s, 1, { type: 'move', agent: e.id, to: 'dubai' }); // 行動2回で手番は自動で終わる
+    s = toAction(s, 0);
+    s.hands[0] = ['checkpoint', 'arrest', 'trap'];
+    const cand = s.agents.find((x) => x.id === e.id).hidden.possible;
+    const picks = new Set();
+    for (const city of cand) {
+      const t = JSON.parse(JSON.stringify(s));
+      t.agents.find((x) => x.id === e.id).city = city;
+      picks.add(JSON.stringify(chooseAction(t, 0, 'hard', seeded(9))));
+    }
+    if (picks.size > 1) diffs += 1;
+  }
+  assert.equal(diffs, 0);
 });

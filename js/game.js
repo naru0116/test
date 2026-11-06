@@ -47,6 +47,8 @@ export const RULES = {
   filesToWin: 2,
   trapLimit: 2,
   firstTurnActions: 1, // 先手有利を減らすため、最初の手番だけ行動1回
+  hideTurns: 2, // 潜伏が続く自分の手番の数（使った手番を含む）
+  opsPerTurn: 1, // 作戦ポイント（カードを捨てて行動+1）を使える回数
   maxRounds: 15,
   logLimit: 100,
 };
@@ -59,7 +61,11 @@ export const CARDS = {
   wiretap: { name: '盗聴', count: 4, short: '手札と罠を暴く', desc: '相手1人の手札をすべて見て、その人が置いている罠の場所も知る。' },
   disguise: { name: '偽装工作', count: 4, short: '正体を入れ替える', desc: '自分の工作員2人の正体（本物/囮）を入れ替える。相手が尋問などで得た正体の情報は無効になる。' },
   extract: { name: '緊急脱出', count: 5, short: '拠点へワープ', desc: '自分の工作員1人を自分の拠点へワープさせる（罠にはかからない）。' },
+  hide: { name: '潜伏', count: 5, short: '姿を消す', desc: '自分の工作員1人を潜伏させる。自分の手番2回分（使った手番を含む）のあいだ、相手には居場所が見えず「いる可能性がある都市」だけがわかる。潜伏中は尋問・拘束・奪取の対象にならない（罠にはかかる）。移動以外の行動をするか、期限が来ると姿を現す。' },
+  checkpoint: { name: '検問', count: 5, short: '潜伏を暴く', desc: '都市を1つ選ぶ。そこに潜伏中の相手の工作員がいれば姿を現す。いなければ「そこにはいない」ことが全員にわかる。' },
 };
+// カードを効果の代わりに「作戦ポイント」として捨てると、行動が1回増える（1ターン1回）
+export const OPS_DESC = '手札を1枚捨てて、この手番の行動を1回増やす（1ターンに1回）。';
 export const CARD_TYPES = Object.keys(CARDS);
 const DECK_SIZE = CARD_TYPES.reduce((n, t) => n + CARDS[t].count, 0);
 
@@ -265,6 +271,25 @@ export function trapHints(state, viewer) {
   return state.traps.filter((t) => !visible.has(t.id)).map((t) => ({ id: t.id, owner: t.owner, cities: trapZone(state, t) }));
 }
 
+// ---------- 潜伏 ----------
+
+// viewer にその工作員の居場所が見えているか
+export function agentVisible(state, viewer, agent) {
+  return !agent.hidden || agent.owner === viewer || state.status === 'finished';
+}
+
+// 潜伏中の工作員がいる可能性のある都市（公開情報）
+export function possibleCities(agent) {
+  return agent.hidden ? agent.hidden.possible : (agent.city ? [agent.city] : []);
+}
+
+// 姿を現す（居場所を公開する）
+function reveal(state, agent, why) {
+  if (!agent.hidden) return;
+  agent.hidden = null;
+  if (agent.city) addLog(state, `${agentName(state, agent.id)}が${cityName(agent.city)}に姿を現した${why ? `（${why}）` : ''}。`);
+}
+
 // 盤上にある各プレイヤーの罠の数（公開情報）
 export function trapCount(state, p) {
   return state.traps.filter((t) => t.owner === p).length;
@@ -281,6 +306,7 @@ function cityName(id) { return cityById[id].name; }
 function startTurn(state) {
   const p = state.turn.player;
   state.turn.actionsLeft = RULES.actionsPerTurn;
+  state.turn.opsUsed = 0;
   addLog(state, `— ラウンド${state.turn.round}: ${state.players[p].name}の番 —`);
   const canDraw = state.hands[p].length < RULES.handLimit && (state.market.length > 0 || state.deck.length > 0 || state.discard.length > 0);
   state.turn.phase = canDraw ? 'draw' : 'action';
@@ -293,6 +319,12 @@ function activePlayers(state) {
 
 function endTurn(state, rng) {
   refillFiles(state);
+  // 潜伏の期限
+  for (const a of state.agents) {
+    if (a.owner !== state.turn.player || !a.hidden) continue;
+    a.hidden.turns -= 1;
+    if (a.hidden.turns <= 0) reveal(state, a, '潜伏の期限');
+  }
   const n = state.players.length;
   const cur = state.turn.player;
   let next = cur;
@@ -352,6 +384,7 @@ function checkWin(state) {
 
 // 工作員を拘束して拠点へ送り返す（拘束カード・罠の共通処理）
 function sendHome(state, agent) {
+  agent.hidden = null;
   const from = agent.city;
   const dropped = agent.files.length;
   state.cityFiles[from].push(...agent.files);
@@ -374,6 +407,7 @@ export function forfeit(stateIn, p, reason = '離脱', rng = Math.random) {
     state.cityFiles[a.city].push(...a.files);
     a.files = [];
     a.city = null;
+    a.hidden = null;
   }
   state.traps = state.traps.filter((t) => t.owner !== p);
   state.discard.push(...state.hands[p]);
@@ -394,6 +428,7 @@ export function forfeit(stateIn, p, reason = '離脱', rng = Math.random) {
 //  {type:'drop', agent, file}
 //  {type:'transfer', agent, to(agentId), file}
 //  {type:'card', card(index in hand), agent?, target?, agent2?, player?, city?}
+//  {type:'ops', card}                                      … カードを捨てて行動+1（1ターン1回）
 //  {type:'endTurn'}
 //  {type:'resign'}
 
@@ -421,19 +456,42 @@ export function applyAction(stateIn, p, action, rng = Math.random) {
       endTurn(state, rng);
       return state;
 
+    case 'ops': {
+      if ((state.turn.opsUsed || 0) >= RULES.opsPerTurn) fail('作戦ポイントはこの手番でもう使いました');
+      const hand = state.hands[p];
+      const ci = action.card;
+      if (!Number.isInteger(ci) || ci < 0 || ci >= hand.length) fail('カードを選んでください');
+      const type = hand.splice(ci, 1)[0];
+      state.discard.push(type);
+      state.turn.actionsLeft += 1;
+      state.turn.opsUsed = (state.turn.opsUsed || 0) + 1;
+      addLog(state, `${me.name}が「${CARDS[type].name}」を作戦ポイントとして使った（行動+1）。`);
+      state.last = { type: 'ops', player: p, card: type };
+      return state;
+    }
+
     case 'move': {
       const a = ownAgent(state, p, action.agent);
       if (!neighbors(a.city).includes(action.to)) fail('線でつながった隣の都市にしか移動できません');
       const from = a.city;
-      addLog(state, `${agentName(state, a.id)}が${cityName(from)}→${cityName(action.to)}へ移動。`);
       a.city = action.to;
-      state.last = { type: 'move', agent: a.id, from, to: action.to };
+      if (a.hidden) {
+        // 潜伏中: 相手に見えるのは「どこかへ1マス動いた」ことだけ
+        a.hidden.possible = [...new Set(a.hidden.possible.flatMap((c) => neighbors(c)))];
+        addLog(state, `潜伏中の${agentName(state, a.id)}がどこかへ移動した（候補${a.hidden.possible.length}都市）。`);
+        addLog(state, `潜伏中の${a.label}は${cityName(from)}→${cityName(action.to)}へ移動。`, p);
+        state.last = { type: 'hiddenMove', agent: a.id };
+      } else {
+        addLog(state, `${agentName(state, a.id)}が${cityName(from)}→${cityName(action.to)}へ移動。`);
+        state.last = { type: 'move', agent: a.id, from, to: action.to };
+      }
       triggerTrap(state, a);
       break;
     }
 
     case 'scout': {
       const a = ownAgent(state, p, action.agent);
+      reveal(state, a, '偵察のため');
       const here = state.cityFiles[a.city];
       if (!here.includes(action.file)) fail('そのファイルはこの都市にありません');
       state.knowledge[p].files[action.file] = state.files[action.file].real;
@@ -445,6 +503,7 @@ export function applyAction(stateIn, p, action, rng = Math.random) {
 
     case 'infiltrate': {
       const a = ownAgent(state, p, action.agent);
+      reveal(state, a, '潜入のため');
       const here = state.cityFiles[a.city];
       if (here.length === 0) fail('この都市にファイルはありません');
       if (a.files.length >= RULES.carryLimit) fail(`1人が持てるファイルは${RULES.carryLimit}つまでです`);
@@ -462,6 +521,7 @@ export function applyAction(stateIn, p, action, rng = Math.random) {
 
     case 'drop': {
       const a = ownAgent(state, p, action.agent);
+      reveal(state, a, 'ファイルを置くため');
       const idx = a.files.indexOf(action.file);
       if (idx < 0) fail('そのファイルを持っていません');
       a.files.splice(idx, 1);
@@ -479,6 +539,8 @@ export function applyAction(stateIn, p, action, rng = Math.random) {
       const idx = a.files.indexOf(action.file);
       if (idx < 0) fail('そのファイルを持っていません');
       if (b.files.length >= RULES.carryLimit) fail(`1人が持てるファイルは${RULES.carryLimit}つまでです`);
+      reveal(state, a, '受け渡しのため');
+      reveal(state, b, '受け渡しのため');
       a.files.splice(idx, 1);
       b.files.push(action.file);
       addLog(state, `${agentName(state, a.id)}が${agentName(state, b.id)}にファイルを渡した。`);
@@ -537,6 +599,7 @@ function enemyAgentSameCity(state, p, mine, targetId) {
   const t = getAgent(state, targetId);
   if (t.owner === p) fail('相手の工作員を選んでください');
   if (!t.city) fail('その工作員は盤上にいません');
+  if (t.hidden) fail('潜伏中の工作員は対象にできません');
   if (t.city !== mine.city) fail('同じ都市にいる相手しか対象にできません');
   return t;
 }
@@ -553,6 +616,7 @@ function playCard(state, p, action, rng) {
     case 'interrogate': {
       const mine = ownAgent(state, p, action.agent);
       const t = enemyAgentSameCity(state, p, mine, action.target);
+      reveal(state, mine, 'カードを使うため');
       const id = isAce(state, t.id) ? 'ace' : 'decoy';
       state.knowledge[p].agents[t.id] = id;
       addLog(state, `【${cname}】${agentName(state, mine.id)}が${agentName(state, t.id)}を尋問した。`);
@@ -563,6 +627,7 @@ function playCard(state, p, action, rng) {
     case 'arrest': {
       const mine = ownAgent(state, p, action.agent);
       const t = enemyAgentSameCity(state, p, mine, action.target);
+      reveal(state, mine, 'カードを使うため');
       if (t.city === state.players[t.owner].base) fail('相手の拠点にいる工作員は拘束できません');
       const { from, dropped } = sendHome(state, t);
       addLog(state, `【${cname}】${agentName(state, mine.id)}が${agentName(state, t.id)}を拘束！ 拠点へ送還。${dropped ? `ファイル${dropped}つが${cityName(from)}に落ちた。` : ''}`);
@@ -572,6 +637,7 @@ function playCard(state, p, action, rng) {
     case 'steal': {
       const mine = ownAgent(state, p, action.agent);
       const t = enemyAgentSameCity(state, p, mine, action.target);
+      reveal(state, mine, 'カードを使うため');
       if (t.city === state.players[t.owner].base) fail('相手の拠点では奪取できません');
       if (t.files.length === 0) fail('相手はファイルを持っていません');
       if (mine.files.length >= RULES.carryLimit) fail(`1人が持てるファイルは${RULES.carryLimit}つまでです`);
@@ -591,6 +657,7 @@ function playCard(state, p, action, rng) {
       if (city !== mine.city && !neighbors(mine.city).includes(city)) fail('罠は工作員がいる都市か隣の都市にしか置けません');
       if (isBase(state, city)) fail('拠点には罠を置けません');
       if (state.traps.some((t) => t.owner === p && t.city === city)) fail('そこにはもう罠を置いています');
+      reveal(state, mine, '罠を仕掛けるため');
       const mineTraps = state.traps.filter((t) => t.owner === p);
       if (mineTraps.length >= RULES.trapLimit) {
         state.traps = state.traps.filter((t) => t.id !== mineTraps[0].id);
@@ -609,8 +676,9 @@ function playCard(state, p, action, rng) {
       const h = state.hands[t];
       const traps = state.traps.filter((x) => x.owner === t);
       for (const x of traps) state.knowledge[p].traps[x.id] = true;
+      const hidden = state.agents.filter((x) => x.owner === t && x.hidden && x.city);
       addLog(state, `【${cname}】${me.name}が${state.players[t].name}を盗聴した。`);
-      addLog(state, `盗聴結果: ${state.players[t].name}の手札は ${h.length ? h.map((c) => CARDS[c].name).join('・') : 'なし'}。罠は ${traps.length ? traps.map((x) => cityName(x.city)).join('・') : 'なし'}。`, p);
+      addLog(state, `盗聴結果: ${state.players[t].name}の手札は ${h.length ? h.map((c) => CARDS[c].name).join('・') : 'なし'}。罠は ${traps.length ? traps.map((x) => cityName(x.city)).join('・') : 'なし'}。${hidden.length ? `潜伏中: ${hidden.map((x) => `${x.label}は${cityName(x.city)}`).join('、')}。` : ''}`, p);
       state.last = { type: 'card', card: type, player: t };
       break;
     }
@@ -633,10 +701,35 @@ function playCard(state, p, action, rng) {
     case 'extract': {
       const a = ownAgent(state, p, action.agent);
       if (a.city === me.base) fail('すでに拠点にいます');
+      reveal(state, a, '緊急脱出のため');
       const from = a.city;
       addLog(state, `【${cname}】${agentName(state, a.id)}が${cityName(from)}から拠点へ緊急脱出！`);
       a.city = me.base;
       state.last = { type: 'move', agent: a.id, from, to: me.base, extract: true };
+      break;
+    }
+    case 'hide': {
+      const a = ownAgent(state, p, action.agent);
+      if (a.hidden) fail('その工作員はすでに潜伏しています');
+      a.hidden = { turns: RULES.hideTurns, possible: [a.city] };
+      addLog(state, `【${cname}】${agentName(state, a.id)}が${cityName(a.city)}から姿を消した。`);
+      state.last = { type: 'card', card: type, agent: a.id, city: a.city };
+      break;
+    }
+    case 'checkpoint': {
+      const city = action.city;
+      if (!cityById[city]) fail('都市を選んでください');
+      const found = state.agents.filter((x) => x.owner !== p && x.hidden && x.city === city);
+      addLog(state, `【${cname}】${me.name}が${cityName(city)}で検問を実施。`);
+      for (const x of found) reveal(state, x, '検問で発見');
+      if (!found.length) addLog(state, `${cityName(city)}に潜伏中の工作員はいなかった。`);
+      // 見つからなかった潜伏者の候補から、この都市を外す（公開情報）
+      for (const x of state.agents) {
+        if (x.owner === p || !x.hidden) continue;
+        const rest = x.hidden.possible.filter((c) => c !== city);
+        if (rest.length) x.hidden.possible = rest;
+      }
+      state.last = { type: 'card', card: type, city, found: found.map((x) => x.id) };
       break;
     }
     default:
@@ -657,7 +750,12 @@ export function legalActions(state, p) {
   }
   const out = [{ type: 'endTurn' }];
   const mine = state.agents.filter((a) => a.owner === p && a.city);
-  const enemies = state.agents.filter((a) => a.owner !== p && a.city);
+  const enemies = state.agents.filter((a) => a.owner !== p && a.city && !a.hidden);
+  if ((state.turn.opsUsed || 0) < RULES.opsPerTurn) {
+    state.hands[p].forEach((type, card) => {
+      if (state.hands[p].indexOf(type) === card) out.push({ type: 'ops', card });
+    });
+  }
   for (const a of mine) {
     for (const to of neighbors(a.city)) out.push({ type: 'move', agent: a.id, to });
     for (const f of state.cityFiles[a.city]) {
@@ -703,6 +801,10 @@ export function legalActions(state, p) {
       state.players.forEach((pl, i) => { if (i !== p && !pl.out) out.push({ type: 'card', card, player: i }); });
     } else if (type === 'extract') {
       for (const a of mine) if (a.city !== state.players[p].base) out.push({ type: 'card', card, agent: a.id });
+    } else if (type === 'hide') {
+      for (const a of mine) if (!a.hidden) out.push({ type: 'card', card, agent: a.id });
+    } else if (type === 'checkpoint') {
+      for (const c of CITIES) out.push({ type: 'card', card, city: c.id });
     }
   });
   return out;
